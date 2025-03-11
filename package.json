@@ -10,6 +10,8 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native-vector-icons/common": "^11.0.0",
+    "@react-native-vector-icons/ionicons": "^7.4.0",
     "@react-navigation/bottom-tabs": "^7.2.1",
     "@react-navigation/elements": "^2.2.6",
     "@react-navigation/native": "^7.0.15",
