@@ -1,6 +1,7 @@
 import React from 'react';
 // import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import HomeScreen from '../screens/Homescreen.tsx';
+import CameraScreen from '../screens/Camerascreen.tsx';
 import {
   createBottomTabNavigator,
   TransitionSpecs,
@@ -29,8 +30,10 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="Create"
-        component={HomeScreen}
+        component={CameraScreen}
         options={{
+            tabBarStyle: { display: 'none' },
+            headerShown: false,
           tabBarIcon: ({color, size}) => (
             <Icon name="journal" color={color} size={size} />
           ),
