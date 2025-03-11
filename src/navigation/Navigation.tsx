@@ -1,15 +1,51 @@
 import React from 'react';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
+// import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import HomeScreen from '../screens/Homescreen.tsx';
+import {
+  createBottomTabNavigator,
+  TransitionSpecs,
+} from '@react-navigation/bottom-tabs';
+import Icon from '@react-native-vector-icons/ionicons';
 
-const Stack = createNativeStackNavigator();
+// const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
-function RootStack() {
+function TabNavigator() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="Home" component={HomeScreen} />
-    </Stack.Navigator>
+    <Tab.Navigator
+      screenOptions={{
+        tabBarShowLabel: false,
+        animation: 'fade',
+        transitionSpec: TransitionSpecs.FadeSpec,
+      }}>
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          tabBarIcon: ({color, size}) => (
+            <Icon name="home" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Create"
+        component={HomeScreen}
+        options={{
+          tabBarIcon: ({color, size}) => (
+            <Icon name="journal" color={color} size={size} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
   );
 }
 
-export default RootStack;
+// function RootStack() {
+//   return (
+//     <Stack.Navigator>
+//       <Stack.Screen name="Home" component={HomeScreen} />
+//     </Stack.Navigator>
+//   );
+// }
+
+export default TabNavigator;
