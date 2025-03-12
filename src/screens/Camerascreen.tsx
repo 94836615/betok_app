@@ -8,6 +8,7 @@ import {
     CameraDevice,
 } from 'react-native-vision-camera';
 import { useIsFocused } from '@react-navigation/native';
+import {CameraRoll} from '@react-native-camera-roll/camera-roll';
 
 function CameraScreen() {
     const cameraRef = useRef<Camera>(null);
@@ -17,23 +18,19 @@ function CameraScreen() {
     const isFocused = useIsFocused();
 
     const [isRecording, setIsRecording] = useState(false);
-    const [videoPath, setVideoPath] = useState<string | null>(null);
-
-    useEffect(() => {
-        (async () => {
-        })();
-    }, []);
 
     const startRecording = useCallback(async () => {
         try {
-            if (!cameraRef.current) return;
+            if (!cameraRef.current) {return;}
             setIsRecording(true);
             cameraRef.current.startRecording({
-              onRecordingFinished: (video: VideoFile) => {
-                console.log('Opname voltooid:', video.path);
-                setVideoPath(video.path);
-                setIsRecording(false);
-              },
+              onRecordingFinished: async (video: VideoFile) => {
+                  const path = video.path;
+                  console.log('Opname voltooid:', video.path);
+                  await CameraRoll.saveAsset(`file://${path}`, {
+                      type: 'video',
+                  });
+                  },
               onRecordingError: (error: CameraCaptureError) => {
                 console.error('Opname mislukt:', error);
                 setIsRecording(false);
