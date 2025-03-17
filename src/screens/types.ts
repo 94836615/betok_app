@@ -1,4 +1,4 @@
 export type RootStackParamList = {
     CameraScreen: undefined;
-    VideoPreviewScreen: { videoPath: string };
+    PreviewScreen: { videoPath: string };
 };

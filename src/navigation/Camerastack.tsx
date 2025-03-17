@@ -1,7 +1,6 @@
-// CameraStack.tsx
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import CameraScreen from '../screens/CameraScreen';
+import CameraScreen from '../screens/Camerascreen';
 import PreviewScreen from '../screens/Previewscreen';
 
 const CameraStackNav = createNativeStackNavigator();
@@ -17,7 +16,7 @@ export function CameraStack() {
             <CameraStackNav.Screen
                 name="PreviewScreen"
                 component={PreviewScreen}
-                // You can customize header if needed
+                // You can customize header if you need
                 // options={{ headerShown: false }}
             />
         </CameraStackNav.Navigator>

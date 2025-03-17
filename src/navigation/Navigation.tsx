@@ -1,13 +1,12 @@
 import React from 'react';
 // import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import HomeScreen from '../screens/Homescreen.tsx';
-import CameraScreen from '../screens/Camerascreen.tsx';
 import {
   createBottomTabNavigator,
   TransitionSpecs,
 } from '@react-navigation/bottom-tabs';
 import Icon from '@react-native-vector-icons/ionicons';
-import {CameraStack} from "./Camerastack.tsx";
+import {CameraStack} from './Camerastack.tsx';
 
 // const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();

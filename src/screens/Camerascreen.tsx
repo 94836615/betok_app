@@ -7,7 +7,11 @@ import {
   VideoFile,
   CameraDevice,
 } from 'react-native-vision-camera';
-import {NavigationProp, useIsFocused, useNavigation} from '@react-navigation/native';
+import {
+  NavigationProp,
+  useIsFocused,
+  useNavigation,
+} from '@react-navigation/native';
 import {RootStackParamList} from './types.ts';
 
 function CameraScreen() {
@@ -40,7 +44,7 @@ function CameraScreen() {
         onRecordingFinished: async (video: VideoFile) => {
           console.log('Recording completed:', video.path);
 
-          navigation.navigate('PreviewScreen', { videoPath: video.path });
+          navigation.navigate('PreviewScreen', {videoPath: video.path});
 
           // await CameraRoll.saveAsset(`file://${path}`, {type: 'video'});
 
@@ -70,11 +74,13 @@ function CameraScreen() {
       console.error(e);
       setIsRecording(false);
     }
-  }, [recordTimeoutId, navigation]);
+  }, [navigation, recordTimeoutId, stopRecording]);
 
   const stopRecording = useCallback(async () => {
     try {
-      if (!cameraRef.current) {return;}
+      if (!cameraRef.current) {
+        return;
+      }
       await cameraRef.current.stopRecording();
 
       if (recordTimeoutId) {
@@ -178,4 +184,3 @@ const styles = StyleSheet.create({
     padding: 10,
   },
 });
-
