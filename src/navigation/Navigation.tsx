@@ -7,9 +7,18 @@ import {
   TransitionSpecs,
 } from '@react-navigation/bottom-tabs';
 import Icon from '@react-native-vector-icons/ionicons';
+import {CameraStack} from "./Camerastack.tsx";
 
 // const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+function journalIcon({color, size}: {color: string; size: number}) {
+  return <Icon name="journal" color={color} size={size} />;
+}
+
+function HomeIcon({color, size}: {color: string; size: number}) {
+  return <Icon name="home" color={color} size={size} />;
+}
 
 function TabNavigator() {
   return (
@@ -23,20 +32,16 @@ function TabNavigator() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({color, size}) => (
-            <Icon name="home" color={color} size={size} />
-          ),
+          tabBarIcon: HomeIcon,
         }}
       />
       <Tab.Screen
         name="Create"
-        component={CameraScreen}
+        component={CameraStack}
         options={{
-            tabBarStyle: { display: 'none' },
-            headerShown: false,
-          tabBarIcon: ({color, size}) => (
-            <Icon name="journal" color={color} size={size} />
-          ),
+          tabBarStyle: {display: 'none'},
+          headerShown: false,
+          tabBarIcon: journalIcon,
         }}
       />
     </Tab.Navigator>
