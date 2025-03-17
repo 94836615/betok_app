@@ -32,6 +32,23 @@ function CameraScreen() {
   const [isRecording, setIsRecording] = useState(false);
   // const [path, setPath] = useState<string | null>(null);
 
+  const stopRecording = useCallback(async () => {
+    try {
+      if (!cameraRef.current) {
+        return;
+      }
+      await cameraRef.current.stopRecording();
+
+      if (recordTimeoutId) {
+        clearTimeout(recordTimeoutId);
+        setRecordTimeoutId(null);
+      }
+      setIsRecording(false);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [recordTimeoutId]);
+
   const startRecording = useCallback(async () => {
     try {
       if (!cameraRef.current) {
@@ -75,23 +92,6 @@ function CameraScreen() {
       setIsRecording(false);
     }
   }, [navigation, recordTimeoutId, stopRecording]);
-
-  const stopRecording = useCallback(async () => {
-    try {
-      if (!cameraRef.current) {
-        return;
-      }
-      await cameraRef.current.stopRecording();
-
-      if (recordTimeoutId) {
-        clearTimeout(recordTimeoutId);
-        setRecordTimeoutId(null);
-      }
-      setIsRecording(false);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [recordTimeoutId]);
 
   if (!device) {
     return (
