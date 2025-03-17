@@ -1,26 +1,24 @@
 import React from 'react';
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
-import {useRoute, useNavigation} from '@react-navigation/native';
+import {View, Text, StyleSheet, TouchableOpacity, Alert} from 'react-native';
+import {useRoute, useNavigation, NavigationProp} from '@react-navigation/native';
 import Video from 'react-native-video';
 import {CameraRoll} from '@react-native-camera-roll/camera-roll';
+import {RootStackParamList} from "./types.ts";
 
 function PreviewScreen() {
     const route = useRoute();
-    const navigation = useNavigation();
-
-    // We assume we passed { videoPath: string } from CameraScreen
+    const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const {videoPath} = route.params as { videoPath: string };
 
     const onClose = () => {
         navigation.goBack();
     };
 
-    // Example of saving to camera roll on demand, after user sees preview
     const onSave = async () => {
         try {
             await CameraRoll.saveAsset(videoPath, { type: 'video' });
             console.log('Video saved to gallery:', videoPath);
-            // Could show an alert or toast here
+            navigation.navigate('CameraScreen');
         } catch (error) {
             console.error('Error saving video:', error);
         }
@@ -28,9 +26,6 @@ function PreviewScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.header}>Preview</Text>
-
-            {/* The video itself */}
             <Video
                 source={{uri: videoPath}}
                 style={styles.video}
