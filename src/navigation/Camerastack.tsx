@@ -16,7 +16,6 @@ export function CameraStack() {
             <CameraStackNav.Screen
                 name="PreviewScreen"
                 component={PreviewScreen}
-                // You can customize header if you need
                 options={{ headerShown: false }}
             />
         </CameraStackNav.Navigator>
