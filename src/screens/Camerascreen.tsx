@@ -22,7 +22,6 @@ function CameraScreen() {
     devices.find(d => d.position === 'back') ??
     devices.find(d => d.position === 'front');
   const isFocused = useIsFocused();
-  // const navigation = useNavigation();
   // 20 sec timeout storage
   const [recordTimeoutId, setRecordTimeoutId] = useState<NodeJS.Timeout | null>(
     null,
