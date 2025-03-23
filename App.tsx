@@ -5,7 +5,7 @@ import RootStack from './src/navigation/Navigation.tsx';
 function App(): React.JSX.Element {
 
   return (
-    <NavigationContainer>
+    <NavigationContainer> # Test comment
       <RootStack />
     </NavigationContainer>
   );
