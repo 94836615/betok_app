@@ -1,3 +1,11 @@
+# [1.0.0-beta.2](https://github.com/94836615/betok_app/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2025-03-28)
+
+
+### Features
+
+* **video-upload:** made it possible to upload videos in the app ([8b4c396](https://github.com/94836615/betok_app/commit/8b4c3964c9e501aa6921c09de0a52f4c4516aa2c))
+* **video-upload:** made it possible to upload your video ([6dbba6e](https://github.com/94836615/betok_app/commit/6dbba6e666f854f1c3202843c646593e4b234cce))
+
 # 1.0.0-beta.1 (2025-03-23)
 
 
