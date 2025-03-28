@@ -8,7 +8,6 @@ import {
 import Video from 'react-native-video';
 
 import {RootStackParamList} from './types.ts';
-import {v4 as uuidv4} from 'uuid';
 
 function PreviewScreen() {
   const route = useRoute();
@@ -28,21 +27,28 @@ function PreviewScreen() {
   //         console.error('Error saving video:', error);
   //     }
   // };
-
   const onSend = async () => {
-    const uniqueName = `${uuidv4()}.mp4`;
     try {
+      const originalName = videoPath.split('/').pop();
+      const fixedUri = videoPath.startsWith('file://')
+        ? videoPath
+        : `file://${videoPath}`;
+
       const formData = new FormData();
       formData.append('video', {
-        uri: videoPath,
-        name: uniqueName,
+        uri: fixedUri,
+        name: originalName,
         type: 'video/mp4',
       });
 
-      const response = await fetch('http://localhost:8000/upload', {
+      const response = await fetch('http://10.0.2.2:8000/api/v1/videos', {
         method: 'POST',
         body: formData,
       });
+
+      console.log('STATUS:', response.status);
+      const responseText = await response.text();
+      console.log('RESPONSE TEXT:', responseText);
 
       if (response.ok) {
         console.info('Video sent successfully');
@@ -111,4 +117,3 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
-
