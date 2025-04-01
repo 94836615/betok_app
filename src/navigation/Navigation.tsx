@@ -32,6 +32,7 @@ function TabNavigator() {
         component={HomeScreen}
         options={{
           tabBarIcon: HomeIcon,
+            headerShown: false,
         }}
       />
       <Tab.Screen
