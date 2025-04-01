@@ -9,24 +9,14 @@ import {
 } from 'react-native';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import Icon from '@react-native-vector-icons/ionicons';
+import ProfileHeader from '../components/ProfileHeader.tsx';
 
 const {height} = Dimensions.get('window');
 
 const Homescreen: React.FC = () => {
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Image
-          source={{uri: 'https://randomuser.me/api/portraits/men/48.jpg'}}
-          style={styles.avatar}
-        />
-        <View style={styles.userInfo}>
-          <Text style={styles.username}>Mitsuo</Text>
-          <Text style={styles.timestamp}>20 min geleden</Text>
-        </View>
-      </View>
-
+      <ProfileHeader />
       {/* Video */}
       <View style={styles.videoWrapper}>
         <Image
@@ -36,7 +26,6 @@ const Homescreen: React.FC = () => {
           style={styles.videoImage}
         />
       </View>
-
       {/* Interactions (right side) */}
       <View style={styles.interactions}>
         <TouchableOpacity style={styles.iconBtn}>
@@ -67,29 +56,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0D0D0D',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 30,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 12,
-  },
-  userInfo: {
-    flexDirection: 'column',
-  },
-  username: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  timestamp: {
-    color: '#AAAAAA',
-    fontSize: 13,
   },
   videoWrapper: {
     justifyContent: 'center',
