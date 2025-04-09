@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   },
   videoImage: {
     width: '100%',
-    height: height * 0.6,
-    borderRadius: 12,
+    height: height,
+    borderRadius: 0,
   },
 });

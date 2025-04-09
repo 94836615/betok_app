@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   FlatList,
   ViewToken,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import ProfileHeader from '../components/ProfileHeader.tsx';
 import VideoCard from '../components/VideoCard.tsx';
@@ -31,6 +32,11 @@ const Homescreen: React.FC = () => {
   const [visibleVideoIndex, setVisibleVideoIndex] = React.useState<
     number | null
   >(null);
+  const [isPaused, setIsPaused] = React.useState(false);
+
+  const togglePause = () => {
+    setIsPaused(prev => !prev);
+  };
 
   const fetchVideos = React.useCallback(async () => {
     if (loading) {
@@ -104,8 +110,14 @@ const Homescreen: React.FC = () => {
     const isVisible = index === visibleVideoIndex;
     return (
       <View style={styles.videoPage}>
-        <ProfileHeader />
-        <VideoCard url={item.url} isVisible={isVisible} />
+        <TouchableWithoutFeedback onPress={togglePause}>
+          <View style={styles.videoContainer}>
+            <VideoCard url={item.url} isVisible={isVisible && !isPaused} />
+          </View>
+        </TouchableWithoutFeedback>
+        <View style={styles.headerOverlay}>
+          <ProfileHeader />
+        </View>
         <InteractionBar />
       </View>
     );
@@ -141,6 +153,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#0D0D0D',
     justifyContent: 'space-between',
   },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  videoContainer: {
+    flex: 1,
+  },
 });
-
 export default Homescreen;
