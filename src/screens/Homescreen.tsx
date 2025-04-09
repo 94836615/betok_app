@@ -5,6 +5,7 @@ import {
   Dimensions,
   ActivityIndicator,
   FlatList,
+  ViewToken,
 } from 'react-native';
 import ProfileHeader from '../components/ProfileHeader.tsx';
 import VideoCard from '../components/VideoCard.tsx';
@@ -25,13 +26,21 @@ const Homescreen: React.FC = () => {
   const [offset, setOffset] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [hasMore, setHasMore] = React.useState(true);
+  const currentIndexRef = React.useRef(0);
+  const lastFetchedAtRef = React.useRef(0); // Track when we last fetched
+  const [visibleVideoIndex, setVisibleVideoIndex] = React.useState<
+    number | null
+  >(null);
 
   const fetchVideos = React.useCallback(async () => {
     if (loading) {
       return;
     }
-    setLoading(true);
+
     try {
+      lastFetchedAtRef.current = videos.length; // Update last fetched index
+      setLoading(true);
+
       const res = await fetch(
         `http://127.0.0.1:8000/api/v1/videos?limit=2&offset=${offset}`,
       );
@@ -46,37 +55,78 @@ const Homescreen: React.FC = () => {
 
       setVideos(prev => [...prev, ...data]);
       setOffset(prev => prev + data.length);
+      lastFetchedAtRef.current = videos.length; // Store the last-fetched index
     } catch (err) {
       console.error('Error loading videos', err);
     } finally {
       setLoading(false);
     }
-  }, [loading, offset]);
+  }, [loading, offset, videos.length]);
 
+  // Initial load
   React.useEffect(() => {
     fetchVideos();
-  }, [fetchVideos]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const renderItem = ({item}: {item: VideoItem}) => {
-    console.log('Rendering video:', item.url); // ✅ zie je deze?
+  React.useEffect(() => {
+    if (
+      currentIndexRef.current >= videos.length - 2 &&
+      !loading &&
+      hasMore &&
+      lastFetchedAtRef.current !== videos.length
+    ) {
+      fetchVideos();
+    }
+  }, [videos.length, loading, hasMore, fetchVideos]);
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 90,
+  };
+  const onViewableItemsChanged = React.useRef(
+    ({viewableItems}: {viewableItems: ViewToken[]}) => {
+      if (viewableItems.length > 0) {
+        const index = viewableItems[0].index ?? 0;
+        console.log('Current visible index:', index);
+        currentIndexRef.current = index;
+        setVisibleVideoIndex(index);
+        // slice video from the beginning
+        if (index >= 3) {
+          setVideos(prev => prev.slice(index));
+        }
+      } else {
+        setVisibleVideoIndex(null);
+      }
+    },
+  ).current;
+
+  const renderItem = ({item, index}: {item: VideoItem; index: number}) => {
+    console.log('Rendering video:', item.url);
+    const isVisible = index === visibleVideoIndex;
     return (
       <View style={styles.videoPage}>
         <ProfileHeader />
-        <VideoCard url={item.url} />
+        <VideoCard url={item.url} isVisible={isVisible} />
         <InteractionBar />
       </View>
     );
   };
+
   return (
     <FlatList
       data={videos}
       renderItem={renderItem}
       keyExtractor={item => item.id}
       pagingEnabled
-      onEndReached={hasMore ? fetchVideos : null}
-      onEndReachedThreshold={0.9}
+      snapToInterval={Dimensions.get('window').height}
+      snapToAlignment="start"
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
       showsVerticalScrollIndicator={false}
       ListFooterComponent={loading ? <ActivityIndicator color="#fff" /> : null}
+      windowSize={3}
+      maxToRenderPerBatch={2}
+      initialNumToRender={2}
+      removeClippedSubviews={true}
     />
   );
 };

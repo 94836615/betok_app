@@ -4,11 +4,23 @@ import Video from 'react-native-video';
 
 const {height} = Dimensions.get('window');
 
-interface Props {
+interface VideoCardProps {
   url: string;
+  isVisible?: boolean;
 }
 
-const VideoCard: React.FC<Props> = ({url}) => {
+const VideoCard: React.FC<VideoCardProps> = ({url, isVisible = false}) => {
+  const onLoad = (data: any) => {
+    console.info('Video loaded successfully', data);
+  };
+
+  const onError = (error: any) => {
+    console.error('Error loading video', error);
+  };
+
+  const onBuffer = (buffer: any) => {
+    console.info('Video buffering', buffer);
+  };
   return (
     <View style={styles.videoWrapper}>
       <Video
@@ -16,7 +28,11 @@ const VideoCard: React.FC<Props> = ({url}) => {
         style={styles.videoImage}
         resizeMode="cover"
         repeat
-        paused={false}
+        paused={!isVisible}
+        muted={!isVisible}
+        onLoad={onLoad}
+        onError={onError}
+        onBuffer={onBuffer}
       />
     </View>
   );
