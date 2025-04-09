@@ -135,8 +135,8 @@ const Homescreen: React.FC = () => {
       viewabilityConfig={viewabilityConfig}
       showsVerticalScrollIndicator={false}
       ListFooterComponent={loading ? <ActivityIndicator color="#fff" /> : null}
-      windowSize={3}
-      maxToRenderPerBatch={2}
+      windowSize={4}
+      maxToRenderPerBatch={3}
       initialNumToRender={2}
       removeClippedSubviews={true}
     />
