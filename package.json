@@ -19,6 +19,7 @@
     "@react-navigation/native-stack": "^7.2.1",
     "react": "19.0.0",
     "react-native": "0.78.0",
+    "react-native-exception-handler": "^2.10.10",
     "react-native-safe-area-context": "^5.3.0",
     "react-native-screens": "^4.9.1",
     "react-native-video": "^6.11.0",
