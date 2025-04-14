@@ -4,7 +4,7 @@
  */
 
 // Maximum number of videos that can be loaded at once
-const MAX_CONCURRENT_VIDEOS = 3;
+const MAX_CONCURRENT_VIDEOS = 2;
 
 // Track loaded videos
 let loadedVideos: string[] = [];
@@ -15,6 +15,7 @@ let loadedVideos: string[] = [];
  * @returns boolean - Whether the video can be loaded (based on current memory constraints)
  */
 export const registerVideoLoad = (videoUrl: string): boolean => {
+  console.log(`[Memory] Before load: ${loadedVideos.length} videos in memory`);
   // Check if we're at the limit
   if (
     loadedVideos.length >= MAX_CONCURRENT_VIDEOS &&

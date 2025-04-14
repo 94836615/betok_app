@@ -22,7 +22,7 @@ function PreviewScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const videoRef = useRef<React.ElementRef<typeof Video>>(null);
+  const videoRef = useRef<Video>(null);
 
   useEffect(() => {
     // Validate video path
@@ -31,10 +31,12 @@ function PreviewScreen() {
       setLoading(false);
     }
 
+    const currentVideoRef = videoRef.current;
+
     // Cleanup function
     return () => {
-      if (videoRef.current) {
-        videoRef.current.seek(0);
+      if (currentVideoRef) {
+        currentVideoRef.seek(0);
       }
     };
   }, [videoPath]);
@@ -55,8 +57,9 @@ function PreviewScreen() {
   };
 
   const onSend = async () => {
-    if (isSending) return;
-
+    if (isSending) {
+      return;
+    }
     try {
       setIsSending(true);
       const originalName = videoPath.split('/').pop() || 'video.mp4';
@@ -79,7 +82,6 @@ function PreviewScreen() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 30000, // 30 second timeout
       });
 
       console.log('SERVER RESPONSE STATUS:', response.status);
@@ -93,7 +95,7 @@ function PreviewScreen() {
         console.error('Failed to send video:', response.status);
         Alert.alert('Error', `Unable to send video: ${response.status}`);
       }
-    } catch (error) {
+    } catch (err) {
       console.error('Error sending video:', error);
       Alert.alert('Error', 'Failed to send video. Please try again.');
     } finally {
@@ -129,7 +131,6 @@ function PreviewScreen() {
             onError={onVideoError}
             repeat={false}
             poster="https://via.placeholder.com/480x800/000000/FFFFFF?text=Loading..."
-            posterResizeMode="cover"
           />
 
           <View style={styles.buttonsRow}>

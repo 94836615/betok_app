@@ -1,12 +1,11 @@
 import React, {useCallback, useRef, useState, useEffect} from 'react';
-import {StyleSheet, Text, TouchableOpacity, View, Alert, Platform} from 'react-native';
+import {StyleSheet, Text, TouchableOpacity, View, Alert} from 'react-native';
 import {
   Camera,
   CameraCaptureError,
   useCameraDevices,
   VideoFile,
   CameraDevice,
-  CameraPermissionStatus,
 } from 'react-native-vision-camera';
 import {
   NavigationProp,
@@ -27,8 +26,8 @@ function CameraScreen() {
   );
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [isRecording, setIsRecording] = useState(false);
-  const [hasPermission, setHasPermission] = useState(false);
   const [isCheckingPermissions, setIsCheckingPermissions] = useState(true);
+  const [combinedPermission, setCombinedPermission] = useState(false);
 
   // Check for camera permissions
   useEffect(() => {
@@ -37,28 +36,30 @@ function CameraScreen() {
         setIsCheckingPermissions(true);
         let cameraPermission = await Camera.getCameraPermissionStatus();
         let microphonePermission = await Camera.getMicrophonePermissionStatus();
-        
+
         // Request permissions if needed
-        if (cameraPermission !== 'authorized') {
+        if (cameraPermission !== 'granted') {
           cameraPermission = await Camera.requestCameraPermission();
         }
-        if (microphonePermission !== 'authorized') {
+        if (microphonePermission !== 'granted') {
           microphonePermission = await Camera.requestMicrophonePermission();
         }
-        
-        setHasPermission(
-          cameraPermission === 'authorized' && microphonePermission === 'authorized'
+
+        setCombinedPermission(
+          cameraPermission === 'granted' && microphonePermission === 'granted',
         );
       } catch (error) {
         console.error('Error checking camera permissions:', error);
         Alert.alert('Permission Error', 'Could not verify camera permissions');
-        setHasPermission(false);
+        setCombinedPermission(false);
       } finally {
         setIsCheckingPermissions(false);
       }
     }
-    
-    checkPermissions();
+
+    checkPermissions().then(c => {
+      console.info('Permissions checked:', c);
+    });
   }, []);
 
   // Cleanup function for camera resources
@@ -67,9 +68,10 @@ function CameraScreen() {
       if (recordTimeoutId) {
         clearTimeout(recordTimeoutId);
       }
-      if (isRecording) {
+      if (isRecording && cameraRef.current) {
         try {
-          cameraRef.current?.stopRecording();
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          cameraRef.current.stopRecording();
         } catch (e) {
           console.error('Error stopping recording during cleanup:', e);
         }
@@ -150,11 +152,11 @@ function CameraScreen() {
     );
   }
 
-  if (!hasPermission) {
+  if (!combinedPermission) {
     return (
       <View style={styles.center}>
         <Text>Camera permission is required</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.buttonRecord}
           onPress={() => navigation.goBack()}>
           <Text style={styles.buttonText}>Go Back</Text>
@@ -167,7 +169,7 @@ function CameraScreen() {
     return (
       <View style={styles.center}>
         <Text>No camera available</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.buttonRecord}
           onPress={() => navigation.goBack()}>
           <Text style={styles.buttonText}>Go Back</Text>
