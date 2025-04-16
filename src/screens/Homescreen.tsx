@@ -115,7 +115,7 @@ const Homescreen: React.FC = () => {
     itemVisiblePercentThreshold: 90,
   };
 
-  onViewableItemsChanged = React.useRef(
+  const onViewableItemsChanged = React.useRef(
       ({viewableItems}: {viewableItems: ViewToken[]}) => {
         if (viewableItems.length > 0) {
           const index = viewableItems[0].index ?? 0;

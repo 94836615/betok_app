@@ -203,7 +203,7 @@ const VideoCard: React.FC<VideoCardProps> = ({url, isVisible = false}) => {
         videoRef.current.seek(0);
         // Force release of video resources
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        videoRef.current.setNativeProps({paused: true, muted: true});
+        videoRef.current.setn({paused: true, muted: true});
       }
       // Ensure this video is unregistered when component unmounts
       VideoManager.unregisterVideo(url);

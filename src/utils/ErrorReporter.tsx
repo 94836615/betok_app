@@ -22,15 +22,15 @@ export const reportError = (error: Error | string, metadata?: any): void => {
     stack: typeof error === 'string' ? undefined : error.stack,
     metadata,
   };
-  
+
   console.error('[ErrorReporter]', errorObj);
-  
+
   // Add to errors array, limiting size
   errors.unshift(errorObj);
   if (errors.length > MAX_ERRORS) {
     errors.pop();
   }
-  
+
   // Could send to a remote error reporting service here
 };
 

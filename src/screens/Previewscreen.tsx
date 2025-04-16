@@ -22,7 +22,7 @@ function PreviewScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const videoRef = useRef<Video>(null);
+  const videoRef = useRef<typeof Video>(null);
 
   useEffect(() => {
     // Validate video path

@@ -41,6 +41,7 @@
     "@semantic-release/github": "^11.0.1",
     "@testing-library/react-native": "^13.2.0",
     "@types/jest": "^29.5.13",
+    "@types/lodash": "^4.17.16",
     "@types/react": "^19.0.0",
     "@types/react-test-renderer": "^19.0.0",
     "cz-conventional-changelog": "^3.3.0",
