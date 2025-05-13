@@ -17,6 +17,7 @@
     "@react-navigation/elements": "^2.2.6",
     "@react-navigation/native": "^7.0.15",
     "@react-navigation/native-stack": "^7.2.1",
+    "metro": "^0.82.3",
     "react": "19.0.0",
     "react-native": "0.78.0",
     "react-native-exception-handler": "^2.10.10",
