@@ -1,3 +1,10 @@
+# [1.0.0-beta.4](https://github.com/94836615/betok_app/compare/v1.0.0-beta.3...v1.0.0-beta.4) (2025-05-21)
+
+
+### Bug Fixes
+
+* **crashes:** fixed app crashes ([7c9e2b9](https://github.com/94836615/betok_app/commit/7c9e2b9b41237de7c588c686d679940cbeeb7270))
+
 # [1.0.0-beta.3](https://github.com/94836615/betok_app/compare/v1.0.0-beta.2...v1.0.0-beta.3) (2025-05-07)
 
 
