@@ -1,3 +1,15 @@
+# [1.1.0-beta.2](https://github.com/94836615/betok_app/compare/v1.1.0-beta.1...v1.1.0-beta.2) (2025-05-21)
+
+
+### Features
+
+* **likes:** implemented likes ([4efb7e8](https://github.com/94836615/betok_app/commit/4efb7e868d3508e0df14030465c91e4ac4cb3a16))
+
+
+### Performance Improvements
+
+* **url handling:** handles invalid urls better ([1548941](https://github.com/94836615/betok_app/commit/1548941582360daaa9e9775b8e665751a5a79902))
+
 # [1.1.0-beta.1](https://github.com/94836615/betok_app/compare/v1.0.0...v1.1.0-beta.1) (2025-05-21)
 
 
