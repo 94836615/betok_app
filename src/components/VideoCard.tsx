@@ -1,235 +1,292 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {View, StyleSheet, Dimensions, ActivityIndicator, Text} from 'react-native';
-import Video from 'react-native-video';
+import React from 'react';
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
+  FlatList,
+  ViewToken,
+  TouchableWithoutFeedback,
+} from 'react-native';
+import ProfileHeader from '../components/ProfileHeader.tsx';
+import VideoCard from '../components/VideoCard.tsx';
+import VideoManager from '../utils/VideoManager.ts';
+// New import at the top of Homescreen.tsx
+import { getDeviceId, formatUUID } from '../utils/user-utils.ts';
+// In Homescreen.tsx, add these imports
+import { useLikedVideos, initGlobalLikedVideos } from '../hooks/useLikedVideos';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const {height} = Dimensions.get('window');
 
-// Global set with a maximum size
-const MAX_CACHE_SIZE = 3;
-const cachedVideoIds = new Set<string>();
-
-interface VideoCardProps {
-  url: string;
-  isVisible: boolean;
+interface VideoItem {
   id: string;
+  url: string;
+  filename: string;
+  caption?: string;
+  created_at: string;
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({url, isVisible, id}) => {
-  const videoRef = useRef<any>(null);
-  const [isBuffering, setIsBuffering] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const isMountedRef = useRef(true);
-  const [videoReady, setVideoReady] = useState(false);
+const Homescreen: React.FC = () => {
+  const [videos, setVideos] = React.useState<VideoItem[]>([]);
+  const [offset, setOffset] = React.useState(0);
+  const [loading, setLoading] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+  const currentIndexRef = React.useRef(0);
+  const lastFetchTimeRef = React.useRef(0);
+  const [loadedVideoIds, setLoadedVideoIds] = React.useState<Set<string>>(
+      new Set(),
+  );
+  const [visibleVideoIndex, setVisibleVideoIndex] = React.useState<
+      number | null
+  >(null);
+  const [isPaused, setIsPaused] = React.useState(false);
 
-  // Add component mount/unmount logging
-  useEffect(() => {
-    console.log(`VideoCard ${id} mounted`);
+  const togglePause = () => {
+    setIsPaused(prev => !prev);
+  };
 
-    return () => {
-      console.log(`VideoCard ${id} unmounting`);
-      isMountedRef.current = false;
+  const keyExtractor = React.useCallback((item: VideoItem, index: number) => {
+    return `${item.id}-${index}`;
+  }, []);
 
-      // Ensure video is properly released
-      if (videoRef.current) {
-        try {
-          // Stop playback and reset position
-          videoRef.current.seek(0);
+  const fetchVideos = React.useCallback(async () => {
+    if (loading || !hasMore) {
+      console.log('Skip fetch: loading =', loading, 'hasMore =', hasMore);
+      console.log(`Memory state before fetch: ${videos.length} videos in state, showing index ${visibleVideoIndex}`);
+      return;
+    }
 
-          // Additional cleanup
-          if (typeof videoRef.current.unload === 'function') {
-            videoRef.current.unload();
+    // Prevent rapid successive calls
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current < 1000) {
+      console.log('Skipping fetch - too soon since last fetch');
+      return;
+    }
+    lastFetchTimeRef.current = now;
+
+    try {
+      console.log('Fetching videos at offset:', offset);
+      setLoading(true);
+
+      const res = await fetch(
+          `http://127.0.0.1:8000/api/v1/videos?limit=2&offset=${offset}`,
+      );
+      const data = await res.json();
+
+      if (!Array.isArray(data) || data.length === 0) {
+        console.log('No more videos available');
+        setHasMore(false);
+        return;
+      }
+
+      // Create a copy of the current loaded IDs
+      const currentIds = new Set([...loadedVideoIds]);
+
+      // Filter out videos we've already loaded
+      const newVideos = data.filter(video => !currentIds.has(video.id));
+      console.log(`Found ${newVideos.length} new videos of ${data.length} fetched`);
+
+      if (newVideos.length === 0) {
+        // We received data but all videos were duplicates
+        console.log('All fetched videos are duplicates, stopping pagination');
+        setHasMore(false);
+        return;
+      }
+
+      // Add new video IDs to our tracking Set
+      newVideos.forEach(video => currentIds.add(video.id));
+      setLoadedVideoIds(currentIds);
+
+      // Update the videos array with new content
+      setVideos(prev => [...prev, ...newVideos]);
+
+      // Update offset for next API call
+      setOffset(prev => prev + data.length);
+    } catch (err) {
+      console.error('Error loading videos:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, hasMore, offset, loadedVideoIds]);
+
+  // Initial load
+  React.useEffect(() => {
+    fetchVideos();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 90,
+  };
+
+  const onViewableItemsChanged = React.useRef(
+      ({viewableItems}: {viewableItems: ViewToken[]}) => {
+        if (viewableItems.length > 0) {
+          const index = viewableItems[0].index ?? 0;
+          const previousIndex = visibleVideoIndex;
+
+          // Force GC on previous video
+          if (previousIndex !== null && previousIndex !== index) {
+            console.log('[Memory] Forcing cleanup from', previousIndex, 'to', index);
+            // Aggressively cleanup previous videos
+            for (let i = 0; i < videos.length; i++) {
+              if (i !== index && videos[i]) {
+                VideoManager.unregisterVideo(videos[i].url);
+              }
+            }
           }
-        } catch (e) {
-          console.error(`Error cleaning up video ${id}:`, e);
+
+          setVisibleVideoIndex(index);
+          currentIndexRef.current = index;
         }
       }
-    };
-  }, [id]);
+  ).current;
 
-  // Handle visibility changes
-  useEffect(() => {
-    if (isVisible) {
-      console.log(`Video ${id} is now visible`);
+  // Initialize global liked videos state
+  const likedVideosStore = useLikedVideos();
 
-      // Manage cache size
-      if (!cachedVideoIds.has(id)) {
-        // If cache is full, remove one item
-        if (cachedVideoIds.size >= MAX_CACHE_SIZE) {
-          const firstItem = cachedVideoIds.values().next().value;
-          console.log(`Cache full, removing ${firstItem}`);
-          cachedVideoIds.delete(firstItem);
-        }
+  // Initialize global reference on mount
+  React.useEffect(() => {
+    initGlobalLikedVideos(likedVideosStore);
+  }, [likedVideosStore]);
 
-        // Add current video to cache
-        cachedVideoIds.add(id);
-        console.log(`Added ${id} to cache. Cache size: ${cachedVideoIds.size}`);
-      }
+  const handleLikeToggle = React.useCallback(async (videoId: string, isLiked: boolean): Promise<boolean> => {
+    try {
+      console.log(`Toggling like for video ${videoId}: ${isLiked ? 'liked' : 'unliked'}`);
 
-      // Reset playback when becoming visible
-      if (videoRef.current && videoReady) {
+      // Get the device ID
+      const deviceId = await getDeviceId();
+      console.log('Device ID:', deviceId);
+
+      // Create the appropriate URL and method based on the action
+      const url = `http://127.0.0.1:8000/api/v1/videos/${videoId}/like`;
+      const method = isLiked ? 'POST' : 'DELETE';
+
+      console.log(`Sending ${method} request to ${url}`);
+
+      // Make the API call to your backend
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(deviceId), // Send the deviceId as the raw body
+      });
+
+      // Log the response status
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        // Try to get the error details
+        let errorText = '';
         try {
-          videoRef.current.seek(0);
+          errorText = await response.text();
+          console.error('Error response:', errorText);
         } catch (e) {
-          console.error(`Error seeking video ${id}:`, e);
+          console.error('Could not read error response');
         }
-      }
-    } else {
-      console.log(`Video ${id} is now hidden`);
 
-      // When hidden, immediately pause and reset
-      if (videoRef.current) {
-        try {
-          videoRef.current.seek(0);
-        } catch (e) {
-          // Ignore errors when releasing resources
-        }
+        throw new Error(`Failed to update like: ${response.status}`);
       }
+
+      // Parse response
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      // Also store the like state in AsyncStorage for persistence
+      const storageKey = `video_like_${videoId}`;
+      await AsyncStorage.setItem(storageKey, String(isLiked));
+
+      return data.success || true;
+    } catch (err) {
+      console.error('Error toggling like:', err);
+      return false;
     }
-  }, [isVisible, id, videoReady]);
+  }, []);
 
-  const onLoadStart = () => {
-    if (!isMountedRef.current) return;
-    console.log(`Starting to load video: ${id}`);
-    setIsBuffering(true);
-    setLoadError(null);
-    setVideoReady(false);
-  };
+  // Pass this to your VideoCard in renderItem
+  const renderItem = React.useCallback(({item, index}) => {
+    // Existing renderItem code...
 
-  const onLoad = (data: any) => {
-    if (!isMountedRef.current) return;
-
-    console.log(`Video loaded: ${id}, duration: ${data.duration}s`);
-    setIsBuffering(false);
-    setVideoReady(true);
-
-    // Start from beginning if visible
-    if (isVisible && videoRef.current) {
-      try {
-        videoRef.current.seek(0);
-      } catch (e) {
-        console.error(`Error seeking video ${id} after load:`, e);
-      }
-    }
-  };
-
-  const onError = (error: any) => {
-    if (!isMountedRef.current) return;
-
-    const errorMessage = error.error?.localizedDescription || 'Video playback error';
-    console.error(`Error playing video ${id}:`, errorMessage);
-    setLoadError(errorMessage);
-    setIsBuffering(false);
-  };
-
-  const onBuffer = (buffer: any) => {
-    if (!isMountedRef.current) return;
-    setIsBuffering(buffer.isBuffering);
-  };
-
-  const onEnd = () => {
-    if (!isMountedRef.current || !isVisible) return;
-
-    console.log(`Video ${id} reached end, looping`);
-    if (videoRef.current) {
-      try {
-        videoRef.current.seek(0);
-      } catch (e) {
-        console.error(`Error seeking to beginning after end for ${id}:`, e);
-      }
-    }
-  };
-
-  // Render loading overlay
-  const renderOverlay = () => {
-    if (!isVisible) return null;
-
-    if (isBuffering) {
-      return (
-        <View style={styles.overlay}>
-          <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.overlayText}>
-            {cachedVideoIds.has(id) ? 'Starting playback...' : 'Loading video...'}
-          </Text>
+    return (
+      <View style={styles.videoPage}>
+        <TouchableWithoutFeedback onPress={togglePause}>
+          <View style={styles.videoContainer}>
+            <VideoCard
+              url={item.url}
+              isVisible={index === visibleVideoIndex && !isPaused}
+              id={item.id}
+              likeCount={item.like_count}
+              onLikeToggle={handleLikeToggle}
+            />
+          </View>
+        </TouchableWithoutFeedback>
+        <View style={styles.headerOverlay}>
+          <ProfileHeader />
         </View>
-      );
-    } else if (loadError) {
-      return (
-        <View style={styles.overlay}>
-          <Text style={styles.errorText}>{loadError}</Text>
-        </View>
-      );
-    }
-    return null;
-  };
-
-  // Return placeholder when not visible
-  if (!isVisible) {
-    return <View style={styles.placeholder} />;
-  }
+      </View>
+    );
+  }, [handleLikeToggle, isPaused, visibleVideoIndex]);
 
   return (
-    <View style={styles.container}>
-      <Video
-        ref={videoRef}
-        source={{uri: url}}
-        style={styles.video}
-        resizeMode="cover"
-        repeat={true}
-        paused={!isVisible}
-        muted={!isVisible}
-        playInBackground={false}
-        onLoadStart={onLoadStart}
-        onLoad={onLoad}
-        onError={onError}
-        onBuffer={onBuffer}
-        onEnd={onEnd}
-        // Minimal buffer settings
-        progressUpdateInterval={1000} // Less frequent updates
-        bufferConfig={{
-          minBufferMs: 5000,           // 5 second buffer minimum
-          maxBufferMs: 15000,          // 15 second maximum buffer
-          bufferForPlaybackMs: 2500,   // Start playback after 2.5s
-          bufferForPlaybackAfterRebufferMs: 5000 // After rebuffer, wait 5s
-        }}
-        ignoreSilentSwitch="ignore"
-        controls={false}
-        preventsDisplaySleepDuringVideoPlayback={isVisible}
+      <FlatList
+          data={videos}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          pagingEnabled
+          snapToInterval={Dimensions.get('window').height}
+          snapToAlignment="start"
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={
+            loading ? (
+                <View
+                    style={{
+                      height: 100,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      backgroundColor: '#0D0D0D',
+                    }}>
+                  <ActivityIndicator size="large" color="#fff" />
+                </View>
+            ) : null
+          }
+          windowSize={2}
+          maxToRenderPerBatch={1}
+          initialNumToRender={1}
+          removeClippedSubviews={true}
+          updateCellsBatchingPeriod={50}
+          onEndReached={() => {
+            if (!loading && hasMore) {
+              console.log('End reached, loading more videos');
+              fetchVideos();
+            }
+          }}
+          onEndReachedThreshold={0.5}
       />
-      {renderOverlay()}
-    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#0D0D0D',
   },
-  video: {
-    width: '100%',
-    height: height,
+  videoPage: {
+    height,
+    backgroundColor: '#0D0D0D',
+    justifyContent: 'space-between',
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
-  overlayText: {
-    color: '#fff',
-    marginTop: 10,
-    fontSize: 16,
-  },
-  errorText: {
-    color: '#fff',
-    textAlign: 'center',
-    padding: 15,
-    fontSize: 16,
-  },
-  placeholder: {
+  videoContainer: {
     flex: 1,
-    backgroundColor: '#111',
   },
 });
-
-export default VideoCard;
+export default Homescreen;
