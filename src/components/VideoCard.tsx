@@ -1,317 +1,235 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {AppState} from 'react-native';
-import {debounce} from 'lodash';
-import {
-  View,
-  StyleSheet,
-  Dimensions,
-  Text,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
-import Video, {VideoRef} from 'react-native-video';
-import VideoManager from '../utils/VideoManager';
+import React, {useEffect, useRef, useState} from 'react';
+import {View, StyleSheet, Dimensions, ActivityIndicator, Text} from 'react-native';
+import Video from 'react-native-video';
 
 const {height} = Dimensions.get('window');
 
+// Global set with a maximum size
+const MAX_CACHE_SIZE = 3;
+const cachedVideoIds = new Set<string>();
+
 interface VideoCardProps {
   url: string;
-  isVisible?: boolean;
+  isVisible: boolean;
+  id: string;
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({url, isVisible = false}) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const [appActive, setAppActive] = useState(true);
-  const videoRef = useRef<VideoRef>(null);
-  const isMounted = useRef(true);
-  const shouldShowVideo = isVisible && appActive && !error;
-  const previousVisible = useRef(isVisible);
+const VideoCard: React.FC<VideoCardProps> = ({url, isVisible, id}) => {
+  const videoRef = useRef<any>(null);
+  const [isBuffering, setIsBuffering] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+  const [videoReady, setVideoReady] = useState(false);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedRegisterVideoLoad = useCallback(
-    debounce((videoUrl: string) => {
-      if (isMounted.current) {
-        VideoManager.registerVideoLoad(videoUrl);
-      }
-    }, 300),
-    [],
-  );
-
+  // Add component mount/unmount logging
   useEffect(() => {
-    if (previousVisible.current && !isVisible) {
+    console.log(`VideoCard ${id} mounted`);
+
+    return () => {
+      console.log(`VideoCard ${id} unmounting`);
+      isMountedRef.current = false;
+
+      // Ensure video is properly released
       if (videoRef.current) {
-        videoRef.current.setNativeProps({muted: true});
-        videoRef.current.seek(0);
-      }
-    }
-
-    previousVisible.current = isVisible;
-  }, [isVisible]);
-
-  // Track app state changes to prevent problems when app is in background
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
-      setAppActive(nextAppState === 'active');
-    };
-    const subscription = AppState.addEventListener(
-      'change',
-      handleAppStateChange,
-    );
-    return () => subscription.remove();
-  }, []);
-
-  // Track component mounting state
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-      debouncedRegisterVideoLoad.cancel();
-    };
-  }, [debouncedRegisterVideoLoad]);
-
-  useEffect(() => {
-    // Register video when component mounts
-    const canLoad = VideoManager.registerVideoLoad(url);
-    if (!canLoad) {
-      setError('Too many videos loaded simultaneously');
-      setLoading(false);
-    } else {
-      // Reset states when URL changes
-      setLoading(true);
-      setError(null);
-      setRetryCount(0);
-      console.log('Loading video URL:', url);
-    }
-
-    // Cleanup function to unregister video when component unmounts
-    return () => {
-      try {
-        if (isMounted.current) {
-          VideoManager.unregisterVideo(url);
-        }
-        if (videoRef.current && isMounted.current) {
-          // eslint-disable-next-line react-hooks/exhaustive-deps
+        try {
+          // Stop playback and reset position
           videoRef.current.seek(0);
-        }
-      } catch (err) {
-        console.log('Cleanup error:', err);
-      }
-      console.log('Unloaded video:', url);
-    };
-  }, [url]);
 
-  // When visibility changes
+          // Additional cleanup
+          if (typeof videoRef.current.unload === 'function') {
+            videoRef.current.unload();
+          }
+        } catch (e) {
+          console.error(`Error cleaning up video ${id}:`, e);
+        }
+      }
+    };
+  }, [id]);
+
+  // Handle visibility changes
   useEffect(() => {
     if (isVisible) {
-      debouncedRegisterVideoLoad(url);
-    } else {
-      try {
-        if (videoRef.current && isMounted.current) {
+      console.log(`Video ${id} is now visible`);
+
+      // Manage cache size
+      if (!cachedVideoIds.has(id)) {
+        // If cache is full, remove one item
+        if (cachedVideoIds.size >= MAX_CACHE_SIZE) {
+          const firstItem = cachedVideoIds.values().next().value;
+          console.log(`Cache full, removing ${firstItem}`);
+          cachedVideoIds.delete(firstItem);
+        }
+
+        // Add current video to cache
+        cachedVideoIds.add(id);
+        console.log(`Added ${id} to cache. Cache size: ${cachedVideoIds.size}`);
+      }
+
+      // Reset playback when becoming visible
+      if (videoRef.current && videoReady) {
+        try {
           videoRef.current.seek(0);
+        } catch (e) {
+          console.error(`Error seeking video ${id}:`, e);
         }
-        VideoManager.unregisterVideo(url);
-      } catch (err) {
-        console.log('Error handling visibility change:', err);
+      }
+    } else {
+      console.log(`Video ${id} is now hidden`);
+
+      // When hidden, immediately pause and reset
+      if (videoRef.current) {
+        try {
+          videoRef.current.seek(0);
+        } catch (e) {
+          // Ignore errors when releasing resources
+        }
       }
     }
+  }, [isVisible, id, videoReady]);
 
-    return () => {
-      try {
-        debouncedRegisterVideoLoad.cancel();
-        if (isMounted.current) {
-          VideoManager.unregisterVideo(url);
-        }
-      } catch (err) {
-        console.log('Cleanup error in visibility effect:', err);
-      }
-    };
-  }, [debouncedRegisterVideoLoad, isVisible, url]);
-
-  const onLoad = (data: any) => {
-    if (!isMounted.current) {
-      return;
-    }
-
-    console.info('Video loaded successfully', {
-      url: url,
-      duration: data.duration,
-      size: `${data.naturalSize?.width || 'unknown'}x${
-        data.naturalSize?.height || 'unknown'
-      }`,
-    });
-    setLoading(false);
-    setError(null);
+  const onLoadStart = () => {
+    if (!isMountedRef.current) return;
+    console.log(`Starting to load video: ${id}`);
+    setIsBuffering(true);
+    setLoadError(null);
+    setVideoReady(false);
   };
 
-  const onBuffer = (data: {isBuffering: boolean}) => {
-    console.log(
-      `Video buffer state: ${data.isBuffering ? 'buffering' : 'playing'}`,
-      {url},
-    );
+  const onLoad = (data: any) => {
+    if (!isMountedRef.current) return;
+
+    console.log(`Video loaded: ${id}, duration: ${data.duration}s`);
+    setIsBuffering(false);
+    setVideoReady(true);
+
+    // Start from beginning if visible
+    if (isVisible && videoRef.current) {
+      try {
+        videoRef.current.seek(0);
+      } catch (e) {
+        console.error(`Error seeking video ${id} after load:`, e);
+      }
+    }
   };
 
   const onError = (error: any) => {
-    if (!isMounted.current) {
-      return;
-    }
+    if (!isMountedRef.current) return;
 
-    const errorDetail = {
-      url: url,
-      code: error.error?.code || 'unknown',
-      message:
-        error.error?.localizedDescription ||
-        error.error?.message ||
-        'Unknown error',
-      domain: error.error?.domain || 'N/A',
-      rawError: JSON.stringify(error),
-    };
-    console.error('Error loading video - full details:', errorDetail);
-    setLoading(false);
-    setError(errorDetail.message);
-
-    // Simple retry mechanism (max 2 retries)
-    if (retryCount < 2) {
-      setTimeout(() => {
-        if (isMounted.current) {
-          console.info(`Retrying video load (${retryCount + 1}/2)`, {url: url});
-          setRetryCount(prev => prev + 1);
-          setLoading(true);
-        }
-      }, 2000 * (retryCount + 1)); // Exponential backoff
-    } else {
-      VideoManager.unregisterVideo(url); // Free up slot after failed retries
-    }
+    const errorMessage = error.error?.localizedDescription || 'Video playback error';
+    console.error(`Error playing video ${id}:`, errorMessage);
+    setLoadError(errorMessage);
+    setIsBuffering(false);
   };
 
-  // Configure source with appropriate type for MOV
-  const getVideoSource = () => {
-    if (url.toLowerCase().endsWith('.mov')) {
-      return {
-        uri: url,
-        type: Platform.OS === 'ios' ? 'video/quicktime' : 'video/mp4',
-        cache: true,
-      };
-    }
-    return {uri: url};
+  const onBuffer = (buffer: any) => {
+    if (!isMountedRef.current) return;
+    setIsBuffering(buffer.isBuffering);
   };
 
-  useEffect(() => {
-    return () => {
-      if (videoRef.current) {
+  const onEnd = () => {
+    if (!isMountedRef.current || !isVisible) return;
+
+    console.log(`Video ${id} reached end, looping`);
+    if (videoRef.current) {
+      try {
         videoRef.current.seek(0);
-        // Force release of video resources
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        videoRef.current.setn({paused: true, muted: true});
+      } catch (e) {
+        console.error(`Error seeking to beginning after end for ${id}:`, e);
       }
-      // Ensure this video is unregistered when component unmounts
-      VideoManager.unregisterVideo(url);
-      console.log('Final cleanup for video:', url);
-    };
-  }, [url]);
+    }
+  };
+
+  // Render loading overlay
+  const renderOverlay = () => {
+    if (!isVisible) return null;
+
+    if (isBuffering) {
+      return (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.overlayText}>
+            {cachedVideoIds.has(id) ? 'Starting playback...' : 'Loading video...'}
+          </Text>
+        </View>
+      );
+    } else if (loadError) {
+      return (
+        <View style={styles.overlay}>
+          <Text style={styles.errorText}>{loadError}</Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  // Return placeholder when not visible
+  if (!isVisible) {
+    return <View style={styles.placeholder} />;
+  }
 
   return (
-    <View style={styles.videoWrapper}>
-      {!error && shouldShowVideo && (
-        <Video
-          ref={videoRef}
-          source={getVideoSource()}
-          style={styles.videoImage}
-          resizeMode="cover"
-          repeat
-          paused={!isVisible}
-          muted={!isVisible}
-          onLoad={onLoad}
-          onError={onError}
-          onBuffer={onBuffer}
-          controls={false}
-          ignoreSilentSwitch="ignore"
-          playInBackground={false}
-          maxBitRate={1500000}
-          poster="https://via.placeholder.com/480x800/000000/FFFFFF?text=Loading..."
-          progressUpdateInterval={500}
-          onEnd={() => {
-            if (videoRef.current && isMounted.current) {
-              videoRef.current.seek(0);
-            }
-          }}
-        />
-      )}
-
-      {loading && (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loaderText}>Loading video...</Text>
-        </View>
-      )}
-
-      {error && !loading && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load video</Text>
-          <Text style={styles.errorDetail}>
-            {error.includes('Activity is null')
-              ? 'App context error - please try again'
-              : error}
-          </Text>
-          {retryCount >= 2 && (
-            <Text style={styles.errorHint}>
-              This might be due to an unsupported format or network issues
-            </Text>
-          )}
-        </View>
-      )}
+    <View style={styles.container}>
+      <Video
+        ref={videoRef}
+        source={{uri: url}}
+        style={styles.video}
+        resizeMode="cover"
+        repeat={true}
+        paused={!isVisible}
+        muted={!isVisible}
+        playInBackground={false}
+        onLoadStart={onLoadStart}
+        onLoad={onLoad}
+        onError={onError}
+        onBuffer={onBuffer}
+        onEnd={onEnd}
+        // Minimal buffer settings
+        progressUpdateInterval={1000} // Less frequent updates
+        bufferConfig={{
+          minBufferMs: 5000,           // 5 second buffer minimum
+          maxBufferMs: 15000,          // 15 second maximum buffer
+          bufferForPlaybackMs: 2500,   // Start playback after 2.5s
+          bufferForPlaybackAfterRebufferMs: 5000 // After rebuffer, wait 5s
+        }}
+        ignoreSilentSwitch="ignore"
+        controls={false}
+        preventsDisplaySleepDuringVideoPlayback={isVisible}
+      />
+      {renderOverlay()}
     </View>
   );
 };
 
-export default VideoCard;
-
 const styles = StyleSheet.create({
-  videoWrapper: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  container: {
     flex: 1,
+    backgroundColor: '#000',
   },
-  videoImage: {
+  video: {
     width: '100%',
     height: height,
-    borderRadius: 0,
   },
-  loaderContainer: {
-    position: 'absolute',
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 20,
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  loaderText: {
-    color: '#FFFFFF',
+  overlayText: {
+    color: '#fff',
     marginTop: 10,
-  },
-  errorContainer: {
-    position: 'absolute',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    maxWidth: '80%',
+    fontSize: 16,
   },
   errorText: {
-    color: '#FF5555',
+    color: '#fff',
+    textAlign: 'center',
+    padding: 15,
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
   },
-  errorDetail: {
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  errorHint: {
-    color: '#CCCCCC',
-    fontSize: 12,
-    marginTop: 10,
-    textAlign: 'center',
+  placeholder: {
+    flex: 1,
+    backgroundColor: '#111',
   },
 });
+
+export default VideoCard;
