@@ -1,5 +1,5 @@
-import React, {useCallback, useRef, useState} from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import React, {useCallback, useRef, useState, useEffect} from 'react';
+import {StyleSheet, Text, TouchableOpacity, View, Alert} from 'react-native';
 import {
   Camera,
   CameraCaptureError,
@@ -17,23 +17,71 @@ import {RootStackParamList} from './types.ts';
 function CameraScreen() {
   const cameraRef = useRef<Camera>(null);
   const devices: CameraDevice[] = useCameraDevices();
-  // Zoek de back camera, of als fallback de front camera
   const device =
     devices.find(d => d.position === 'back') ??
     devices.find(d => d.position === 'front');
   const isFocused = useIsFocused();
-  // 20 sec timeout storage
   const [recordTimeoutId, setRecordTimeoutId] = useState<NodeJS.Timeout | null>(
     null,
   );
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-
   const [isRecording, setIsRecording] = useState(false);
-  // const [path, setPath] = useState<string | null>(null);
+  const [isCheckingPermissions, setIsCheckingPermissions] = useState(true);
+  const [combinedPermission, setCombinedPermission] = useState(false);
+
+  // Check for camera permissions
+  useEffect(() => {
+    async function checkPermissions() {
+      try {
+        setIsCheckingPermissions(true);
+        let cameraPermission = await Camera.getCameraPermissionStatus();
+        let microphonePermission = await Camera.getMicrophonePermissionStatus();
+
+        // Request permissions if needed
+        if (cameraPermission !== 'granted') {
+          cameraPermission = await Camera.requestCameraPermission();
+        }
+        if (microphonePermission !== 'granted') {
+          microphonePermission = await Camera.requestMicrophonePermission();
+        }
+
+        setCombinedPermission(
+          cameraPermission === 'granted' && microphonePermission === 'granted',
+        );
+      } catch (error) {
+        console.error('Error checking camera permissions:', error);
+        Alert.alert('Permission Error', 'Could not verify camera permissions');
+        setCombinedPermission(false);
+      } finally {
+        setIsCheckingPermissions(false);
+      }
+    }
+
+    checkPermissions().then(c => {
+      console.info('Permissions checked:', c);
+    });
+  }, []);
+
+  // Cleanup function for camera resources
+  useEffect(() => {
+    return () => {
+      if (recordTimeoutId) {
+        clearTimeout(recordTimeoutId);
+      }
+      if (isRecording && cameraRef.current) {
+        try {
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          cameraRef.current.stopRecording();
+        } catch (e) {
+          console.error('Error stopping recording during cleanup:', e);
+        }
+      }
+    };
+  }, [isRecording, recordTimeoutId]);
 
   const stopRecording = useCallback(async () => {
     try {
-      if (!cameraRef.current) {
+      if (!cameraRef.current || !isRecording) {
         return;
       }
       await cameraRef.current.stopRecording();
@@ -44,13 +92,14 @@ function CameraScreen() {
       }
       setIsRecording(false);
     } catch (e) {
-      console.error(e);
+      console.error('Error stopping recording:', e);
+      setIsRecording(false);
     }
-  }, [recordTimeoutId]);
+  }, [recordTimeoutId, isRecording]);
 
   const startRecording = useCallback(async () => {
     try {
-      if (!cameraRef.current) {
+      if (!cameraRef.current || isRecording) {
         return;
       }
       setIsRecording(true);
@@ -60,9 +109,10 @@ function CameraScreen() {
         onRecordingFinished: async (video: VideoFile) => {
           console.log('Recording completed:', video.path);
 
-          navigation.navigate('PreviewScreen', {videoPath: video.path});
-
-          // await CameraRoll.saveAsset(`file://${path}`, {type: 'video'});
+          // Add a short delay to make sure the video file is fully written
+          setTimeout(() => {
+            navigation.navigate('PreviewScreen', {videoPath: video.path});
+          }, 300);
 
           if (recordTimeoutId) {
             clearTimeout(recordTimeoutId);
@@ -72,6 +122,7 @@ function CameraScreen() {
         },
         onRecordingError: (error: CameraCaptureError) => {
           console.error('Recording failed:', error);
+          Alert.alert('Recording Error', 'Failed to record video');
           if (recordTimeoutId) {
             clearTimeout(recordTimeoutId);
             setRecordTimeoutId(null);
@@ -87,15 +138,42 @@ function CameraScreen() {
 
       setRecordTimeoutId(timeoutId);
     } catch (e) {
-      console.error(e);
+      console.error('Error starting recording:', e);
       setIsRecording(false);
+      Alert.alert('Camera Error', 'Could not start recording');
     }
-  }, [navigation, recordTimeoutId, stopRecording]);
+  }, [navigation, recordTimeoutId, stopRecording, isRecording]);
+
+  if (isCheckingPermissions) {
+    return (
+      <View style={styles.center}>
+        <Text>Checking camera permissions...</Text>
+      </View>
+    );
+  }
+
+  if (!combinedPermission) {
+    return (
+      <View style={styles.center}>
+        <Text>Camera permission is required</Text>
+        <TouchableOpacity
+          style={styles.buttonRecord}
+          onPress={() => navigation.goBack()}>
+          <Text style={styles.buttonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!device) {
     return (
       <View style={styles.center}>
         <Text>No camera available</Text>
+        <TouchableOpacity
+          style={styles.buttonRecord}
+          onPress={() => navigation.goBack()}>
+          <Text style={styles.buttonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -107,9 +185,10 @@ function CameraScreen() {
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
           device={device}
-          isActive={true}
+          isActive={isFocused}
           video={true}
           audio={true}
+          enableZoomGesture
         />
       )}
 
@@ -126,12 +205,6 @@ function CameraScreen() {
           </TouchableOpacity>
         )}
       </View>
-
-      {/*{path && (*/}
-      {/*    <View style={styles.videoPathContainer}>*/}
-      {/*        <Text style={styles.videoPathText}>Video opgeslagen op: {path}</Text>*/}
-      {/*    </View>*/}
-      {/*)}*/}
     </View>
   );
 }
