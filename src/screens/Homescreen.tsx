@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useCallback, useEffect, useState, useRef} from 'react';
 import {
   View,
   StyleSheet,
@@ -7,15 +7,12 @@ import {
   FlatList,
   ViewToken,
   TouchableWithoutFeedback,
+  Text,
+  SafeAreaView,
 } from 'react-native';
 import ProfileHeader from '../components/ProfileHeader.tsx';
 import VideoCard from '../components/VideoCard.tsx';
-import VideoManager from '../utils/VideoManager.ts';
-// New import at the top of Homescreen.tsx
-import { getDeviceId, formatUUID } from '../utils/user-utils.ts';
-// In Homescreen.tsx, add these imports
-import { useLikedVideos, initGlobalLikedVideos } from '../hooks/useLikedVideos';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import InteractionBar from '../components/InteractionBar.tsx';
 
 const {height} = Dimensions.get('window');
 
@@ -28,255 +25,409 @@ interface VideoItem {
 }
 
 const Homescreen: React.FC = () => {
-  const [videos, setVideos] = React.useState<VideoItem[]>([]);
-  const [offset, setOffset] = React.useState(0);
-  const [loading, setLoading] = React.useState(false);
-  const [hasMore, setHasMore] = React.useState(true);
-  const currentIndexRef = React.useRef(0);
-  const lastFetchTimeRef = React.useRef(0);
-  const [loadedVideoIds, setLoadedVideoIds] = React.useState<Set<string>>(
-      new Set(),
-  );
-  const [visibleVideoIndex, setVisibleVideoIndex] = React.useState<
-      number | null
-  >(null);
-  const [isPaused, setIsPaused] = React.useState(false);
+  const [videoMetadata, setVideoMetadata] = useState<VideoItem[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Add this flag to track when we've reached the end of available videos
+  const [reachedEndOfList, setReachedEndOfList] = useState(false);
+
+  // Track scroll direction to handle up vs down scrolling differently
+  const [scrollDirection, setScrollDirection] = useState<'up' | 'down' | null>(null);
+  const previousIndexRef = useRef(0);
+
+  // Limit total videos to prevent memory issues
+  const MAX_VIDEOS = 10;
+
+  const flatListRef = useRef<FlatList>(null);
+  const currentOffsetRef = useRef(0);
+  const lastCleanupRef = useRef(Date.now());
+
+  // Track loaded video IDs to prevent duplicates
+  const loadedVideoIds = useRef(new Set<string>());
 
   const togglePause = () => {
     setIsPaused(prev => !prev);
   };
 
-  const keyExtractor = React.useCallback((item: VideoItem, index: number) => {
-    return `${item.id}-${index}`;
+  // Initial data load
+  useEffect(() => {
+    const loadInitialVideos = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('http://127.0.0.1:8000/api/v1/videos?limit=2&offset=0');
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid response format');
+        }
+
+        console.log(`Loaded ${data.length} initial videos`);
+
+        // Track loaded IDs
+        data.forEach(item => loadedVideoIds.current.add(item.id));
+
+        setVideoMetadata(data);
+        currentOffsetRef.current = data.length;
+
+        // Check if we might have reached the end already
+        if (data.length < 2) {
+          console.log('Initial data suggests we may have reached the end of the list');
+          setReachedEndOfList(true);
+        }
+      } catch (err) {
+        console.error('Failed to load initial videos:', err);
+        setError('Failed to load videos. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialVideos();
   }, []);
 
-  const fetchVideos = React.useCallback(async () => {
-    if (loading || !hasMore) {
-      console.log('Skip fetch: loading =', loading, 'hasMore =', hasMore);
-      console.log(`Memory state before fetch: ${videos.length} videos in state, showing index ${visibleVideoIndex}`);
-      return;
+  // Track direction of scrolling
+  useEffect(() => {
+    if (previousIndexRef.current < activeIndex) {
+      setScrollDirection('down');
+    } else if (previousIndexRef.current > activeIndex) {
+      setScrollDirection('up');
     }
 
-    // Prevent rapid successive calls
-    const now = Date.now();
-    if (now - lastFetchTimeRef.current < 1000) {
-      console.log('Skipping fetch - too soon since last fetch');
-      return;
-    }
-    lastFetchTimeRef.current = now;
+    previousIndexRef.current = activeIndex;
+  }, [activeIndex]);
 
-    try {
-      console.log('Fetching videos at offset:', offset);
-      setLoading(true);
+  // Memory cleanup
+  useEffect(() => {
+    const memoryCleanupInterval = setInterval(() => {
+      if (Date.now() - lastCleanupRef.current >= 20000) {
+        console.log('Running memory cleanup');
 
-      const res = await fetch(
-          `http://127.0.0.1:8000/api/v1/videos?limit=2&offset=${offset}`,
-      );
-      const data = await res.json();
+        // Specifically clear far-away videos from memory
+        if (videoMetadata.length > 5) {
+          // Keep only videos within reasonable range of current position
+          const newMetadata = videoMetadata.filter((_, index) =>
+            Math.abs(index - activeIndex) <= 3
+          );
 
-      if (!Array.isArray(data) || data.length === 0) {
-        console.log('No more videos available');
-        setHasMore(false);
-        return;
-      }
-
-      // Create a copy of the current loaded IDs
-      const currentIds = new Set([...loadedVideoIds]);
-
-      // Filter out videos we've already loaded
-      const newVideos = data.filter(video => !currentIds.has(video.id));
-      console.log(`Found ${newVideos.length} new videos of ${data.length} fetched`);
-
-      if (newVideos.length === 0) {
-        // We received data but all videos were duplicates
-        console.log('All fetched videos are duplicates, stopping pagination');
-        setHasMore(false);
-        return;
-      }
-
-      // Add new video IDs to our tracking Set
-      newVideos.forEach(video => currentIds.add(video.id));
-      setLoadedVideoIds(currentIds);
-
-      // Update the videos array with new content
-      setVideos(prev => [...prev, ...newVideos]);
-
-      // Update offset for next API call
-      setOffset(prev => prev + data.length);
-    } catch (err) {
-      console.error('Error loading videos:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [loading, hasMore, offset, loadedVideoIds]);
-
-  // Initial load
-  React.useEffect(() => {
-    fetchVideos();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const viewabilityConfig = {
-    itemVisiblePercentThreshold: 90,
-  };
-
-  const onViewableItemsChanged = React.useRef(
-      ({viewableItems}: {viewableItems: ViewToken[]}) => {
-        if (viewableItems.length > 0) {
-          const index = viewableItems[0].index ?? 0;
-          const previousIndex = visibleVideoIndex;
-
-          // Force GC on previous video
-          if (previousIndex !== null && previousIndex !== index) {
-            console.log('[Memory] Forcing cleanup from', previousIndex, 'to', index);
-            // Aggressively cleanup previous videos
-            for (let i = 0; i < videos.length; i++) {
-              if (i !== index && videos[i]) {
-                VideoManager.unregisterVideo(videos[i].url);
-              }
-            }
+          if (newMetadata.length < videoMetadata.length) {
+            console.log(`Pruning ${videoMetadata.length - newMetadata.length} videos far from current position`);
+            setVideoMetadata(newMetadata);
           }
-
-          setVisibleVideoIndex(index);
-          currentIndexRef.current = index;
         }
+
+        lastCleanupRef.current = Date.now();
       }
-  ).current;
+    }, 5000);
 
-  // Initialize global liked videos state
-  const likedVideosStore = useLikedVideos();
+    return () => clearInterval(memoryCleanupInterval);
+  }, [videoMetadata, activeIndex]);
 
-  // Initialize global reference on mount
-  React.useEffect(() => {
-    initGlobalLikedVideos(likedVideosStore);
-  }, [likedVideosStore]);
+  // Load more videos when scrolling down
+  const loadMoreVideos = useCallback(async () => {
+    // Don't load more if:
+    // 1. We're already loading
+    // 2. We're at max capacity
+    // 3. We've reached the end of available videos
+    if (loadingMore || videoMetadata.length >= MAX_VIDEOS || reachedEndOfList) {
+      if (videoMetadata.length >= MAX_VIDEOS) {
+        console.log(`Hit maximum video limit (${MAX_VIDEOS}), not loading more`);
+      }
+      if (reachedEndOfList) {
+        console.log('Already reached end of list, not loading more');
+      }
+      return;
+    }
 
-  const handleLikeToggle = React.useCallback(async (videoId: string, isLiked: boolean): Promise<boolean> => {
     try {
-      console.log(`Toggling like for video ${videoId}: ${isLiked ? 'liked' : 'unliked'}`);
+      setLoadingMore(true);
+      const offset = currentOffsetRef.current;
 
-      // Get the device ID
-      const deviceId = await getDeviceId();
-      console.log('Device ID:', deviceId);
-
-      // Create the appropriate URL and method based on the action
-      const url = `http://127.0.0.1:8000/api/v1/videos/${videoId}/like`;
-      const method = isLiked ? 'POST' : 'DELETE';
-
-      console.log(`Sending ${method} request to ${url}`);
-
-      // Make the API call to your backend
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(deviceId), // Send the deviceId as the raw body
-      });
-
-      // Log the response status
-      console.log('Response status:', response.status);
+      console.log(`Loading more videos from offset ${offset}`);
+      const response = await fetch(`http://127.0.0.1:8000/api/v1/videos?limit=2&offset=${offset}`);
 
       if (!response.ok) {
-        // Try to get the error details
-        let errorText = '';
-        try {
-          errorText = await response.text();
-          console.error('Error response:', errorText);
-        } catch (e) {
-          console.error('Could not read error response');
-        }
-
-        throw new Error(`Failed to update like: ${response.status}`);
+        throw new Error(`Server error: ${response.status}`);
       }
 
-      // Parse response
       const data = await response.json();
-      console.log('Response data:', data);
 
-      // Also store the like state in AsyncStorage for persistence
-      const storageKey = `video_like_${videoId}`;
-      await AsyncStorage.setItem(storageKey, String(isLiked));
+      // If we got no videos or empty array, we've reached the end
+      if (!Array.isArray(data) || data.length === 0) {
+        console.log('No more videos available, reached end of list');
+        setReachedEndOfList(true);
+        return;
+      }
 
-      return data.success || true;
+      // Filter out duplicates
+      const newVideos = data.filter(video => !loadedVideoIds.current.has(video.id));
+
+      // If after filtering we have no new videos, we've effectively reached the end
+      if (newVideos.length === 0) {
+        console.log('All returned videos already loaded, reached end of list');
+        setReachedEndOfList(true);
+        return;
+      }
+
+      // Track new video IDs
+      newVideos.forEach(item => loadedVideoIds.current.add(item.id));
+
+      console.log(`Adding ${newVideos.length} new videos`);
+
+      // If adding these would exceed limit, only take what we can fit
+      const videosToAdd = newVideos.slice(0, MAX_VIDEOS - videoMetadata.length);
+
+      setVideoMetadata(prev => [...prev, ...videosToAdd]);
+      currentOffsetRef.current += videosToAdd.length;
+
+      // If we got fewer videos than requested, we've reached the end
+      if (data.length < 2) {
+        console.log('Received fewer videos than requested, reached end of list');
+        setReachedEndOfList(true);
+      }
     } catch (err) {
-      console.error('Error toggling like:', err);
-      return false;
+      console.error('Failed to load more videos:', err);
+      // On error, assume we might have reached the end to prevent spam
+      setReachedEndOfList(true);
+    } finally {
+      setLoadingMore(false);
     }
-  }, []);
+  }, [loadingMore, videoMetadata.length, reachedEndOfList]);
 
-  // Pass this to your VideoCard in renderItem
-  const renderItem = React.useCallback(({item, index}) => {
-    // Existing renderItem code...
+  // Load more when near the end of the list when scrolling DOWN
+  useEffect(() => {
+    if (
+      scrollDirection === 'down' &&
+      activeIndex >= videoMetadata.length - 2 &&
+      videoMetadata.length > 0 &&
+      !reachedEndOfList  // Only try to load more if we haven't reached the end
+    ) {
+      loadMoreVideos();
+    }
+  }, [activeIndex, videoMetadata.length, loadMoreVideos, scrollDirection, reachedEndOfList]);
+
+  // Handle viewability changes
+  const onViewableItemsChanged = useCallback(({viewableItems}: {viewableItems: ViewToken[]}) => {
+    if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+      const newIndex = viewableItems[0].index;
+      // Avoid unnecessary updates
+      if (newIndex !== activeIndex) {
+        console.log(`Video at index ${newIndex} is now visible`);
+        setActiveIndex(newIndex);
+      }
+    }
+  }, [activeIndex]);
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 50,
+  };
+
+  // Only render the active video to save memory
+  const shouldRenderVideo = useCallback((index: number) => {
+    return index === activeIndex;
+  }, [activeIndex]);
+
+  // Render a video item
+  const renderItem = useCallback(({item, index}: {item: VideoItem; index: number}) => {
+    const isActive = index === activeIndex;
+    const shouldRender = shouldRenderVideo(index);
 
     return (
       <View style={styles.videoPage}>
         <TouchableWithoutFeedback onPress={togglePause}>
           <View style={styles.videoContainer}>
-            <VideoCard
-              url={item.url}
-              isVisible={index === visibleVideoIndex && !isPaused}
-              id={item.id}
-              likeCount={item.like_count}
-              onLikeToggle={handleLikeToggle}
-            />
+            {shouldRender ? (
+              <VideoCard
+                key={`video-${item.id}`}
+                url={item.url}
+                isVisible={isActive && !isPaused}
+                id={item.id}
+              />
+            ) : (
+              <View style={styles.placeholder} />
+            )}
           </View>
         </TouchableWithoutFeedback>
         <View style={styles.headerOverlay}>
           <ProfileHeader />
         </View>
+        <View style={styles.interactionContainer}>
+          <InteractionBar />
+        </View>
       </View>
     );
-  }, [handleLikeToggle, isPaused, visibleVideoIndex]);
+  }, [activeIndex, isPaused, shouldRenderVideo]);
 
+  // Generate keys for list items
+  const keyExtractor = useCallback((item: VideoItem) => item.id, []);
+
+  // Reset function for retry button
+  const resetAndRetry = useCallback(() => {
+    setError(null);
+    setLoading(true);
+    loadedVideoIds.current.clear(); // Reset loaded IDs
+    setReachedEndOfList(false); // Reset end of list flag
+
+    fetch('http://127.0.0.1:8000/api/v1/videos?limit=2&offset=0')
+      .then(res => res.json())
+      .then(data => {
+        data.forEach((item: VideoItem) => loadedVideoIds.current.add(item.id));
+        setVideoMetadata(data);
+        currentOffsetRef.current = data.length;
+        setLoading(false);
+
+        // Check if we might have reached the end already
+        if (data.length < 2) {
+          setReachedEndOfList(true);
+        }
+      })
+      .catch(err => {
+        console.error('Retry failed:', err);
+        setError('Failed to load videos. Please try again.');
+        setLoading(false);
+      });
+  }, []);
+
+  // Loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#fff" />
+      </SafeAreaView>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableWithoutFeedback onPress={resetAndRetry}>
+          <View style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </View>
+        </TouchableWithoutFeedback>
+      </SafeAreaView>
+    );
+  }
+
+  // Empty state
+  if (videoMetadata.length === 0) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centerContent]}>
+        <Text style={styles.emptyText}>No videos available</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Normal rendering with videos
   return (
-      <FlatList
-          data={videos}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          pagingEnabled
-          snapToInterval={Dimensions.get('window').height}
-          snapToAlignment="start"
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          showsVerticalScrollIndicator={false}
-          ListFooterComponent={
-            loading ? (
-                <View
-                    style={{
-                      height: 100,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      backgroundColor: '#0D0D0D',
-                    }}>
-                  <ActivityIndicator size="large" color="#fff" />
-                </View>
-            ) : null
-          }
-          windowSize={2}
-          maxToRenderPerBatch={1}
-          initialNumToRender={1}
-          removeClippedSubviews={true}
-          updateCellsBatchingPeriod={50}
-          onEndReached={() => {
-            if (!loading && hasMore) {
-              console.log('End reached, loading more videos');
-              fetchVideos();
-            }
-          }}
-          onEndReachedThreshold={0.5}
-      />
+    <FlatList
+      ref={flatListRef}
+      data={videoMetadata}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      pagingEnabled
+      snapToInterval={height}
+      snapToAlignment="start"
+      decelerationRate="fast"
+      showsVerticalScrollIndicator={false}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
+      // Disable momentum to prevent scrolling too far
+      disableIntervalMomentum={true}
+      ListFooterComponent={
+        // Show footer only if we're loading or have reached the end
+        loadingMore ? (
+          <View style={[styles.loadingFooter, styles.centerContent]}>
+            <ActivityIndicator color="#fff" />
+          </View>
+        ) : reachedEndOfList ? (
+          <View style={[styles.loadingFooter, styles.centerContent]}>
+            <Text style={styles.endOfListText}>End of videos</Text>
+          </View>
+        ) : null
+      }
+      maxToRenderPerBatch={1}
+      windowSize={2}
+      initialNumToRender={1}
+      updateCellsBatchingPeriod={150}
+      getItemLayout={(data, index) => ({
+        length: height,
+        offset: height * index,
+        index,
+      })}
+      // This is important for memory management
+      removeClippedSubviews={true}
+      extraData={[activeIndex, isPaused, reachedEndOfList]}
+      // For iOS, make sure scrolling is smooth
+      scrollEventThrottle={16}
+      // Safe scroll mode to prevent scroll bugs
+      maintainVisibleContentPosition={{
+        minIndexForVisible: 0,
+        autoscrollToTopThreshold: 1
+      }}
+      // Prevent excessive scrolling
+      onEndReachedThreshold={0.1}
+    />
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: '#000',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 16,
+    margin: 20,
+    textAlign: 'center',
+  },
+  emptyText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  endOfListText: {
+    color: '#777',
+    fontSize: 14,
+    textAlign: 'center',
+    padding: 10,
+  },
+  retryButton: {
+    backgroundColor: '#333',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
   },
   videoPage: {
     height,
-    backgroundColor: '#0D0D0D',
-    justifyContent: 'space-between',
+    backgroundColor: '#000',
+    position: 'relative',
+  },
+  videoContainer: {
+    flex: 1,
+  },
+  placeholder: {
+    flex: 1,
+    backgroundColor: '#111',
   },
   headerOverlay: {
     position: 'absolute',
@@ -285,8 +436,16 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 10,
   },
-  videoContainer: {
-    flex: 1,
+  interactionContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  loadingFooter: {
+    height: 50,
   },
 });
+
 export default Homescreen;
