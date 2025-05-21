@@ -10,8 +10,12 @@ import {
 } from 'react-native';
 import ProfileHeader from '../components/ProfileHeader.tsx';
 import VideoCard from '../components/VideoCard.tsx';
-import InteractionBar from '../components/InteractionBar.tsx';
 import VideoManager from '../utils/VideoManager.ts';
+// New import at the top of Homescreen.tsx
+import { getDeviceId, formatUUID } from '../utils/user-utils.ts';
+// In Homescreen.tsx, add these imports
+import { useLikedVideos, initGlobalLikedVideos } from '../hooks/useLikedVideos';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const {height} = Dimensions.get('window');
 
@@ -138,22 +142,91 @@ const Homescreen: React.FC = () => {
       }
   ).current;
 
-  const renderItem = ({item, index}: {item: VideoItem; index: number}) => {
-    const isVisible = index === visibleVideoIndex;
+  // Initialize global liked videos state
+  const likedVideosStore = useLikedVideos();
+
+  // Initialize global reference on mount
+  React.useEffect(() => {
+    initGlobalLikedVideos(likedVideosStore);
+  }, [likedVideosStore]);
+
+  const handleLikeToggle = React.useCallback(async (videoId: string, isLiked: boolean): Promise<boolean> => {
+    try {
+      console.log(`Toggling like for video ${videoId}: ${isLiked ? 'liked' : 'unliked'}`);
+
+      // Get the device ID
+      const deviceId = await getDeviceId();
+      console.log('Device ID:', deviceId);
+
+      // Create the appropriate URL and method based on the action
+      const url = `http://127.0.0.1:8000/api/v1/videos/${videoId}/like`;
+      const method = isLiked ? 'POST' : 'DELETE';
+
+      console.log(`Sending ${method} request to ${url}`);
+
+      // Make the API call to your backend
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(deviceId), // Send the deviceId as the raw body
+      });
+
+      // Log the response status
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        // Try to get the error details
+        let errorText = '';
+        try {
+          errorText = await response.text();
+          console.error('Error response:', errorText);
+        } catch (e) {
+          console.error('Could not read error response');
+        }
+
+        throw new Error(`Failed to update like: ${response.status}`);
+      }
+
+      // Parse response
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      // Also store the like state in AsyncStorage for persistence
+      const storageKey = `video_like_${videoId}`;
+      await AsyncStorage.setItem(storageKey, String(isLiked));
+
+      return data.success || true;
+    } catch (err) {
+      console.error('Error toggling like:', err);
+      return false;
+    }
+  }, []);
+
+  // Pass this to your VideoCard in renderItem
+  const renderItem = React.useCallback(({item, index}) => {
+    // Existing renderItem code...
+
     return (
-        <View style={styles.videoPage}>
-          <TouchableWithoutFeedback onPress={togglePause}>
-            <View style={styles.videoContainer}>
-              <VideoCard url={item.url} isVisible={isVisible && !isPaused} />
-            </View>
-          </TouchableWithoutFeedback>
-          <View style={styles.headerOverlay}>
-            <ProfileHeader />
+      <View style={styles.videoPage}>
+        <TouchableWithoutFeedback onPress={togglePause}>
+          <View style={styles.videoContainer}>
+            <VideoCard
+              url={item.url}
+              isVisible={index === visibleVideoIndex && !isPaused}
+              id={item.id}
+              likeCount={item.like_count}
+              onLikeToggle={handleLikeToggle}
+            />
           </View>
-          <InteractionBar />
+        </TouchableWithoutFeedback>
+        <View style={styles.headerOverlay}>
+          <ProfileHeader />
         </View>
+      </View>
     );
-  };
+  }, [handleLikeToggle, isPaused, visibleVideoIndex]);
 
   return (
       <FlatList
