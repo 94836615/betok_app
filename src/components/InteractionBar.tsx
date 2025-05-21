@@ -5,57 +5,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  Animated,
 } from 'react-native';
 import Icon from '@react-native-vector-icons/ionicons';
-import { useLike } from '../hooks/useLike';
 
 const {height} = Dimensions.get('window');
 
-interface InteractionBarProps {
-  initialLikes?: number;
-  initialLiked?: boolean;
-  videoId?: string;
-  onLikeToggle?: (videoId: string, isLiked: boolean) => Promise<boolean>;
-}
-
-const InteractionBar: React.FC<InteractionBarProps> = ({
-  initialLikes = 0,
-  initialLiked = false,
-  videoId = '',
-  onLikeToggle,
-}) => {
-  // Use our custom hook for like functionality
-  const {
-    isLiked,
-    formattedCount,
-    isLoading,
-    error,
-    toggleLike,
-    scaleAnim,
-  } = useLike({
-    initialLiked,
-    initialCount: initialLikes,
-    videoId,
-    onLikeCallback: onLikeToggle,
-  });
-
+const InteractionBar = () => {
   return (
     <View style={styles.interactions}>
-      <TouchableOpacity
-        style={styles.iconBtn}
-        onPress={toggleLike}
-        disabled={isLoading}
-      >
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-          <Icon
-            name={isLiked ? 'heart' : 'heart-outline'}
-            size={28}
-            color={isLiked ? '#ff4d4d' : '#fff'}
-          />
-        </Animated.View>
-        <Text style={styles.iconText}>{formattedCount}</Text>
-        {error && <Text style={styles.errorText}>{error}</Text>}
+      <TouchableOpacity style={styles.iconBtn}>
+        <Icon name="heart-outline" size={28} color="#fff" />
+        <Text style={styles.iconText}>3,2K</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.iconBtn}>
@@ -77,7 +37,6 @@ const InteractionBar: React.FC<InteractionBarProps> = ({
 export default InteractionBar;
 
 const styles = StyleSheet.create({
-  // Keep existing styles
   interactions: {
     position: 'absolute',
     right: 16,
@@ -87,20 +46,10 @@ const styles = StyleSheet.create({
   iconBtn: {
     alignItems: 'center',
     marginBottom: 22,
-    minHeight: 50, // Make room for error message
   },
   iconText: {
     color: '#fff',
     fontSize: 12,
     marginTop: 4,
-  },
-  errorText: {
-    color: '#ff4d4d',
-    fontSize: 10,
-    marginTop: 2,
-    position: 'absolute',
-    bottom: -18,
-    width: 80,
-    textAlign: 'center',
   },
 });
