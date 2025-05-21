@@ -9,7 +9,6 @@ import {
   TouchableWithoutFeedback,
   Text,
   SafeAreaView,
-  Platform,
 } from 'react-native';
 import ProfileHeader from '../components/ProfileHeader.tsx';
 import VideoCard from '../components/VideoCard.tsx';
