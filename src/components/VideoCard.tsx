@@ -114,16 +114,36 @@ const VideoCard: React.FC<VideoCardProps> = ({
     }
   }, [id, isVisible]);
 
+  // In VideoCard.tsx - completely revised video cleanup
   useEffect(() => {
     console.log(`VideoCard ${id} mounted with URL: ${sanitizedUrl}`);
 
+    // On mount, ensure clean state
+    if (videoRef.current) {
+      videoRef.current.seek(0);
+    }
+
     return () => {
-      console.log(`VideoCard ${id} unmounting`);
+      console.log(`VideoCard ${id} unmounting - aggressive cleanup`);
       isMountedRef.current = false;
 
       if (videoRef.current) {
         try {
+          // Stop any playback immediately
+          videoRef.current.setNativeProps({ paused: true });
+
+          // Reset to beginning
           videoRef.current.seek(0);
+
+          // Clear the source - critical for memory release
+          videoRef.current.setNativeProps({ source: null });
+
+          // Null out the ref
+          setTimeout(() => {
+            videoRef.current = null;
+          }, 50);
+
+          console.log(`[Memory] VideoCard ${id} resources forcibly released`);
         } catch (e) {
           console.error(`Error cleaning up video ${id}:`, e);
         }
@@ -189,24 +209,31 @@ const VideoCard: React.FC<VideoCardProps> = ({
     <View style={styles.container}>
       <Video
         ref={videoRef}
-        source={{uri: sanitizedUrl}}
+        source={{uri: sanitizedUrl}}  // Always provide the URI
         style={styles.video}
         resizeMode="cover"
         repeat={true}
-        paused={!isVisible}
+        paused={!isVisible}  // Use paused to control playback instead
+        // Other props remain the same
         muted={!isVisible}
         playInBackground={false}
         onLoadStart={onLoadStart}
         onLoad={onLoad}
         onError={onError}
         onBuffer={onBuffer}
-        // Better buffer settings
+        // Better buffer settings - smaller buffers
         progressUpdateInterval={1000}
         bufferConfig={{
-          minBufferMs: 5000,
-          maxBufferMs: 15000,
-          bufferForPlaybackMs: 2500,
-          bufferForPlaybackAfterRebufferMs: 5000,
+          minBufferMs: 2000,           // Reduced buffer size
+          maxBufferMs: 5000,           // Reduced max buffer
+          bufferForPlaybackMs: 1000,   // Smaller playback buffer
+          bufferForPlaybackAfterRebufferMs: 2000,
+        }}
+        // Critical for memory management
+        onEnd={() => {
+          if (videoRef.current) {
+            videoRef.current.seek(0);  // Reset position on end
+          }
         }}
         ignoreSilentSwitch="ignore"
         controls={false}

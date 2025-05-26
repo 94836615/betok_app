@@ -12,10 +12,12 @@ import ProfileHeader from '../components/ProfileHeader.tsx';
 import VideoCard from '../components/VideoCard.tsx';
 import VideoManager from '../utils/VideoManager.ts';
 // New import at the top of Homescreen.tsx
-import { getDeviceId, formatUUID } from '../utils/user-utils.ts';
+import { getDeviceId } from '../utils/user-utils.ts';
 // In Homescreen.tsx, add these imports
 import { useLikedVideos, initGlobalLikedVideos } from '../hooks/useLikedVideos';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// Add these imports at the top of Homescreen.tsx
+import { InteractionManager } from 'react-native';
 
 const {height} = Dimensions.get('window');
 
@@ -41,6 +43,10 @@ const Homescreen: React.FC = () => {
       number | null
   >(null);
   const [isPaused, setIsPaused] = React.useState(false);
+  // Add this state at the top of your Homescreen component
+  const [resetKey, setResetKey] = React.useState(0);
+  // Add this state
+  const [swipeCount, setSwipeCount] = React.useState(0);
 
   const togglePause = () => {
     setIsPaused(prev => !prev);
@@ -115,32 +121,40 @@ const Homescreen: React.FC = () => {
     fetchVideos();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const viewabilityConfig = {
-    itemVisiblePercentThreshold: 90,
-  };
+  const viewabilityConfig = React.useRef({
+    itemVisiblePercentThreshold: 50,  // Reduce from 90 to 50
+    minimumViewTime: 100,  // Add minimum view time
+  }).current;
 
+  // Then modify onViewableItemsChanged
   const onViewableItemsChanged = React.useRef(
-      ({viewableItems}: {viewableItems: ViewToken[]}) => {
-        if (viewableItems.length > 0) {
-          const index = viewableItems[0].index ?? 0;
-          const previousIndex = visibleVideoIndex;
+  ({viewableItems}: {viewableItems: ViewToken[]}) => {
+    if (viewableItems.length > 0) {
+      const index = viewableItems[0].index ?? 0;
+      const previousIndex = visibleVideoIndex;
 
-          // Force GC on previous video
-          if (previousIndex !== null && previousIndex !== index) {
-            console.log('[Memory] Forcing cleanup from', previousIndex, 'to', index);
-            // Aggressively cleanup previous videos
-            for (let i = 0; i < videos.length; i++) {
-              if (i !== index && videos[i]) {
-                VideoManager.unregisterVideo(videos[i].url);
-              }
-            }
-          }
+      console.log(`Viewable items changed: now showing index ${index}`);
 
-          setVisibleVideoIndex(index);
-          currentIndexRef.current = index;
-        }
+      if (previousIndex !== null && previousIndex !== index) {
+        // Track the swipe but don't do aggressive cleanup
+        console.log(`[Swipe] Moving from ${previousIndex} to ${index}`);
+
+        // Increment swipe count more safely (without causing state updates during render)
+        setTimeout(() => {
+          setSwipeCount(prevCount => {
+            const newCount = prevCount + 1;
+            console.log(`Updated swipe count: ${newCount}`);
+            return newCount;
+          });
+        }, 0);
       }
-  ).current;
+
+      // Update visible index
+      setVisibleVideoIndex(index);
+      currentIndexRef.current = index;
+    }
+  }
+).current;
 
   // Initialize global liked videos state
   const likedVideosStore = useLikedVideos();
@@ -228,8 +242,105 @@ const Homescreen: React.FC = () => {
     );
   }, [handleLikeToggle, isPaused, visibleVideoIndex]);
 
+  // Inside the Homescreen component, add this useEffect hook
+  React.useEffect(() => {
+    // Set up memory usage monitoring
+    let memoryMonitoringInterval: NodeJS.Timeout;
+
+    const startMemoryMonitoring = () => {
+      memoryMonitoringInterval = setInterval(() => {
+        if (global.performance && global.performance.memory) {
+          const { usedJSHeapSize, totalJSHeapSize } = global.performance.memory;
+          const usedMB = Math.round(usedJSHeapSize / (1024 * 1024));
+          const totalMB = Math.round(totalJSHeapSize / (1024 * 1024));
+          console.log(`Memory usage: ${usedMB}MB / ${totalMB}MB`);
+        } else {
+          // Alternative memory logging using heap snapshot info
+          const memoryUsage = getMemoryUsage();
+          console.log(`Memory usage (estimated): ${memoryUsage}`);
+        }
+      }, 2000); // Check every 2 seconds
+    };
+
+    // Helper function for platforms where performance.memory isn't available
+    const getMemoryUsage = (): string => {
+      if (global.gc) {
+        // Force garbage collection if available
+        global.gc();
+      }
+
+      return 'Memory API not available on this device';
+    };
+
+    // Start monitoring after initial render
+    InteractionManager.runAfterInteractions(() => {
+      startMemoryMonitoring();
+    });
+
+    return () => {
+      // Clean up interval on component unmount
+      if (memoryMonitoringInterval) {
+        clearInterval(memoryMonitoringInterval);
+      }
+    };
+  }, []);
+
+  // Add this function to handle memory reset
+  const resetVideoMemory = React.useCallback(() => {
+  console.log('[Memory] Performing gentle reset of video components');
+
+  // Only unregister videos that aren't currently visible or adjacent
+  videos.forEach((video, index) => {
+    if (
+      video &&
+      video.url &&
+      index !== visibleVideoIndex &&
+      index !== visibleVideoIndex + 1 &&
+      index !== visibleVideoIndex - 1
+    ) {
+      VideoManager.unregisterVideo(video.url);
+    }
+  });
+
+  // Don't change the FlatList key - that's causing scroll issues
+  // Instead, just update a counter for tracking
+  setResetKey(prevKey => prevKey + 1);
+
+  // Reset swipe counter
+  setSwipeCount(0);
+}, [videos, visibleVideoIndex]);
+
+  // Keep track of when the app started for deep cleanup
+  const startTimeRef = React.useRef(Date.now());
+
+  // Set up a regular cleanup timer
+  React.useEffect(() => {
+    // Clean up videos every 30 seconds regardless of user action
+    const cleanupInterval = setInterval(() => {
+      console.log('[Memory] Performing scheduled cleanup');
+
+      // Force cleanup all videos except current one
+      videos.forEach((video, index) => {
+        if (index !== visibleVideoIndex && video && video.url) {
+          VideoManager.unregisterVideo(video.url);
+        }
+      });
+
+      // If we've been running a while, do a complete reset
+      if (Date.now() - startTimeRef.current > 10 * 60 * 1000) { // 10 minutes
+        console.log('[Memory] Performing deep cleanup after extended runtime');
+        resetVideoMemory();
+      }
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(cleanupInterval);
+  }, [videos, visibleVideoIndex, resetVideoMemory]);
+
   return (
       <FlatList
+          // Remove the key prop or make it less aggressive
+          // key={`video-list-${resetKey}`}  // Comment this out for now
+          key="video-list-fixed"  // Use a constant key instead of a changing one
           data={videos}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
@@ -252,10 +363,10 @@ const Homescreen: React.FC = () => {
                 </View>
             ) : null
           }
-          windowSize={2}
-          maxToRenderPerBatch={1}
-          initialNumToRender={1}
-          removeClippedSubviews={true}
+          windowSize={3}  // Increase to load more content off-screen
+          maxToRenderPerBatch={2}  // Increase to render more items per batch
+          initialNumToRender={2}  // Show more items initially
+          removeClippedSubviewws={false}  // Disable this optimization temporarily
           updateCellsBatchingPeriod={50}
           onEndReached={() => {
             if (!loading && hasMore) {
