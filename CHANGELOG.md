@@ -1,3 +1,10 @@
+# [1.1.0-beta.3](https://github.com/94836615/betok_app/compare/v1.1.0-beta.2...v1.1.0-beta.3) (2025-05-26)
+
+
+### Performance Improvements
+
+* **crash:** crash fixes ([2da6363](https://github.com/94836615/betok_app/commit/2da63632319f32a2658edf11620b1d06b0193a03))
+
 # [1.1.0-beta.2](https://github.com/94836615/betok_app/compare/v1.1.0-beta.1...v1.1.0-beta.2) (2025-05-21)
 
 
