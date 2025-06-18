@@ -1,3 +1,10 @@
+# [1.1.0-beta.4](https://github.com/94836615/betok_app/compare/v1.1.0-beta.3...v1.1.0-beta.4) (2025-06-18)
+
+
+### Features
+
+* **comments:** implemented comments ([d5dc9bf](https://github.com/94836615/betok_app/commit/d5dc9bfd0143d62dcb5eff7b8e4dfdea108d97d4))
+
 # [1.1.0-beta.3](https://github.com/94836615/betok_app/compare/v1.1.0-beta.2...v1.1.0-beta.3) (2025-05-26)
 
 
