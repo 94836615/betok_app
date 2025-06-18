@@ -1,25 +1,25 @@
-// src/screens/UserIdentificationScreen.tsx
-import React, { useEffect, useState } from 'react';
+// src/screens/UserIdScreen.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
-  Share,
+  TextInput,
   Alert,
-  TextInput
+  ActivityIndicator,
+  Share
 } from 'react-native';
-import { getDeviceId, formatUUID } from '../utils/user-utils';
+import { getDeviceId } from '../utils/user-utils';
 
-interface UserIdentificationScreenProps {
+interface UserIdScreenProps {
   onContinue: () => void;
 }
 
-const UserIdentificationScreen: React.FC<UserIdentificationScreenProps> = ({ onContinue }) => {
+const UserIdScreen: React.FC<UserIdScreenProps> = ({ onContinue }) => {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [followUserId, setFollowUserId] = useState('');
+  const [followId, setFollowId] = useState('');
   const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
@@ -27,9 +27,8 @@ const UserIdentificationScreen: React.FC<UserIdentificationScreenProps> = ({ onC
       try {
         const id = await getDeviceId();
         setUserId(id);
-      } catch (error) {
-        console.error('Error loading user ID:', error);
-        Alert.alert('Error', 'Could not load your user ID. Please restart the app.');
+      } catch (err) {
+        console.error('Error loading user ID:', err);
       } finally {
         setLoading(false);
       }
@@ -38,40 +37,41 @@ const UserIdentificationScreen: React.FC<UserIdentificationScreenProps> = ({ onC
     loadUserId();
   }, []);
 
-  const handleShareUserId = async () => {
+  const handleShare = async () => {
     if (!userId) return;
 
     try {
       await Share.share({
-        message: `Follow me on Betok! My user ID is: ${userId}`
+        message: `Follow me on our app! My user ID is: ${userId}`
       });
-    } catch (error) {
-      console.error('Error sharing user ID:', error);
+    } catch (err) {
+      console.error('Error sharing:', err);
     }
   };
 
-  const handleFollowUser = async () => {
-    if (!followUserId.trim() || !userId) return;
+  const handleFollow = async () => {
+    if (!followId.trim() || !userId) return;
 
     setFollowLoading(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/users/${followUserId}/follow`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ follower_id: userId }),
-      });
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/v1/users/${followId}/follow`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ follower_id: userId }),
+        }
+      );
 
       if (response.ok) {
-        Alert.alert('Success', `You are now following user ${followUserId}`);
-        setFollowUserId('');
+        Alert.alert('Success', 'You are now following this user!');
+        setFollowId('');
       } else {
-        Alert.alert('Error', 'Could not follow this user. Please check the ID and try again.');
+        Alert.alert('Error', 'Could not follow this user. Please check the ID.');
       }
-    } catch (error) {
-      console.error('Error following user:', error);
-      Alert.alert('Error', 'Network error. Please try again later.');
+    } catch (err) {
+      console.error('Error following user:', err);
+      Alert.alert('Error', 'Network error. Please try again.');
     } finally {
       setFollowLoading(false);
     }
@@ -81,52 +81,50 @@ const UserIdentificationScreen: React.FC<UserIdentificationScreenProps> = ({ onC
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#FF5A5F" />
-        <Text style={styles.loadingText}>Loading your unique ID...</Text>
+        <Text style={styles.text}>Loading your unique ID...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Your Betok ID</Text>
+      <Text style={styles.title}>Your Unique ID</Text>
 
       <View style={styles.idContainer}>
-        <Text style={styles.idText}>{formatUUID(userId || '')}</Text>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShareUserId}>
-          <Text style={styles.shareButtonText}>Share</Text>
+        <Text style={styles.idText}>{userId}</Text>
+        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+          <Text style={styles.buttonText}>Share</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.instructions}>
-        This is your unique ID. Share it with friends so they can follow you!
+      <Text style={styles.description}>
+        This is your unique identifier. Share it with friends so they can follow you!
       </Text>
 
-      <View style={styles.followContainer}>
-        <Text style={styles.followTitle}>Follow Someone</Text>
+      <View style={styles.followSection}>
+        <Text style={styles.subtitle}>Follow Someone</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter User ID"
+          placeholder="Enter a user ID"
           placeholderTextColor="#999"
-          value={followUserId}
-          onChangeText={setFollowUserId}
-          autoCapitalize="none"
-          autoCorrect={false}
+          value={followId}
+          onChangeText={setFollowId}
         />
         <TouchableOpacity
-          style={[styles.followButton, followLoading && styles.followButtonDisabled]}
-          onPress={handleFollowUser}
+          style={[styles.followButton, followLoading && styles.disabledButton]}
+          onPress={handleFollow}
           disabled={followLoading}
         >
           {followLoading ? (
             <ActivityIndicator size="small" color="#FFF" />
           ) : (
-            <Text style={styles.followButtonText}>Follow</Text>
+            <Text style={styles.buttonText}>Follow</Text>
           )}
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.continueButton} onPress={onContinue}>
-        <Text style={styles.continueButtonText}>Continue to Videos</Text>
+        <Text style={styles.buttonText}>Continue to App</Text>
       </TouchableOpacity>
     </View>
   );
@@ -137,14 +135,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0D0D0D',
     padding: 20,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
     color: '#FFF',
+    fontWeight: 'bold',
     marginBottom: 20,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#FFF',
+    fontWeight: 'bold',
+    marginBottom: 10,
   },
   idContainer: {
     flexDirection: 'row',
@@ -152,40 +156,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#222',
     padding: 15,
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 10,
     width: '100%',
   },
   idText: {
     color: '#FF5A5F',
     fontSize: 16,
     flex: 1,
-    fontFamily: 'monospace',
   },
-  shareButton: {
-    backgroundColor: '#FF5A5F',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5,
-  },
-  shareButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-  },
-  instructions: {
+  description: {
     color: '#CCC',
     textAlign: 'center',
-    marginBottom: 40,
-    fontSize: 14,
+    marginBottom: 30,
   },
-  followContainer: {
+  followSection: {
     width: '100%',
-    marginBottom: 40,
-  },
-  followTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 10,
+    marginBottom: 30,
   },
   input: {
     backgroundColor: '#222',
@@ -195,19 +181,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     width: '100%',
   },
+  shareButton: {
+    backgroundColor: '#FF5A5F',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 5,
+  },
   followButton: {
     backgroundColor: '#FF5A5F',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
   },
-  followButtonDisabled: {
+  disabledButton: {
     backgroundColor: '#888',
-  },
-  followButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   continueButton: {
     backgroundColor: '#444',
@@ -216,15 +203,14 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  continueButtonText: {
+  buttonText: {
     color: '#FFF',
     fontWeight: 'bold',
-    fontSize: 16,
   },
-  loadingText: {
+  text: {
     color: '#FFF',
-    marginTop: 15,
+    marginTop: 10,
   }
 });
 
-export default UserIdentificationScreen;
+export default UserIdScreen;

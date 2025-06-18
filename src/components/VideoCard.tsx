@@ -5,15 +5,24 @@ import InteractionBar from './InteractionBar';
 import { getDeviceId } from '../utils/user-utils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getGlobalLikedVideos } from '../hooks/useLikedVideos';
+import FollowButton from './FollowButton';
+import { getGlobalFollowedUsers } from '../hooks/useFollowedUsers';
 
 const { height } = Dimensions.get('window');
 
+// In VideoCard.tsx, add to the existing props
+// Add to the props interface
 interface VideoCardProps {
+  // Existing props
   url: string;
   isVisible: boolean;
   id: string;
   likeCount?: number;
   onLikeToggle?: (videoId: string, isLiked: boolean) => Promise<boolean>;
+  // ...existing props
+  userId?: string;
+  username?: string;
+  onToggleFollow?: (userId: string, shouldFollow: boolean) => Promise<boolean>;
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({
@@ -22,12 +31,19 @@ const VideoCard: React.FC<VideoCardProps> = ({
   id,
   likeCount = 0,
   onLikeToggle,
+  userId,
+  username,
+  onToggleFollow,
 }) => {
   const videoRef = useRef<any>(null);
   const [isBuffering, setIsBuffering] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
   const [initialLiked, setInitialLiked] = useState(false);
+
+  // Add these state variables
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
 
   // Sanitize the URL to ensure it's valid
   const sanitizedUrl = React.useMemo(() => {
@@ -114,6 +130,33 @@ const VideoCard: React.FC<VideoCardProps> = ({
     }
   }, [id, isVisible]);
 
+  // Add useEffect to check if user is followed
+  useEffect(() => {
+    if (userId) {
+      const followedUsersStore = getGlobalFollowedUsers();
+      if (followedUsersStore && followedUsersStore.isUserFollowed) {
+        setIsFollowing(followedUsersStore.isUserFollowed(userId));
+      }
+    }
+  }, [userId]);
+
+  // Add this function to handle follow toggle
+  const handleFollowToggle = async () => {
+    if (!userId || !onToggleFollow) return;
+
+    setIsFollowLoading(true);
+    try {
+      const success = await onToggleFollow(userId, !isFollowing);
+      if (success) {
+        setIsFollowing(!isFollowing);
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
   // In VideoCard.tsx - completely revised video cleanup
   useEffect(() => {
     console.log(`VideoCard ${id} mounted with URL: ${sanitizedUrl}`);
@@ -172,7 +215,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
     const errorDetails = error.error?.errorException || '';
     const errorStack = error.error?.errorStackTrace || '';
 
-    console.error(`Error loading video - full details:`, error);
+    console.error('Error loading video - full details:', error);
 
     // Check for specific network errors
     if (errorStack && errorStack.includes('UnknownHostException')) {
@@ -240,6 +283,16 @@ const VideoCard: React.FC<VideoCardProps> = ({
         preventsDisplaySleepDuringVideoPlayback={isVisible}
       />
 
+      {userId && (
+        <View style={styles.userInfoContainer}>
+          <Text style={styles.username}>{username}</Text>
+          <FollowButton
+            userId={userId}
+            onToggleFollow={onToggleFollow || (() => Promise.resolve(false))}
+          />
+        </View>
+      )}
+
       <InteractionBar
         videoId={id}
         initialLikes={likeCount}
@@ -268,6 +321,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
   );
 };
 
+// Add these styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -306,6 +360,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#111',
   },
+  // Add these styles
+  userInfoContainer: {
+    position: 'absolute',
+    bottom: 120,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    zIndex: 10,
+  },
+  username: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginRight: 10,
+  }
 });
 
 export default VideoCard;
