@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -18,6 +18,8 @@ import { useLikedVideos, initGlobalLikedVideos } from '../hooks/useLikedVideos';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // Add these imports at the top of Homescreen.tsx
 import { InteractionManager } from 'react-native';
+// Import CommentModal
+import CommentModal from '../components/CommentModal.tsx';
 
 const {height} = Dimensions.get('window');
 
@@ -30,23 +32,27 @@ interface VideoItem {
 }
 
 const Homescreen: React.FC = () => {
-  const [videos, setVideos] = React.useState<VideoItem[]>([]);
-  const [offset, setOffset] = React.useState(0);
-  const [loading, setLoading] = React.useState(false);
-  const [hasMore, setHasMore] = React.useState(true);
+  const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const currentIndexRef = React.useRef(0);
   const lastFetchTimeRef = React.useRef(0);
-  const [loadedVideoIds, setLoadedVideoIds] = React.useState<Set<string>>(
+  const [loadedVideoIds, setLoadedVideoIds] = useState<Set<string>>(
       new Set(),
   );
-  const [visibleVideoIndex, setVisibleVideoIndex] = React.useState<
+  const [visibleVideoIndex, setVisibleVideoIndex] = useState<
       number | null
   >(null);
-  const [isPaused, setIsPaused] = React.useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   // Add this state at the top of your Homescreen component
-  const [resetKey, setResetKey] = React.useState(0);
+  const [resetKey, setResetKey] = useState(0);
   // Add this state
-  const [swipeCount, setSwipeCount] = React.useState(0);
+  const [swipeCount, setSwipeCount] = useState(0);
+
+  // Comment modal state
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const [currentCommentVideoId, setCurrentCommentVideoId] = useState<string>('');
 
   const togglePause = () => {
     setIsPaused(prev => !prev);
@@ -164,6 +170,98 @@ const Homescreen: React.FC = () => {
     initGlobalLikedVideos(likedVideosStore);
   }, [likedVideosStore]);
 
+  // Handler for comment icon press
+  const handleCommentPress = (videoId: string) => {
+    setCurrentCommentVideoId(videoId);
+    setCommentModalVisible(true);
+  };
+
+  // Handler for posting comments
+  const handleCommentSubmit = async (videoId: string, comment: string): Promise<boolean> => {
+    try {
+      console.log(`Posting comment for video ${videoId}: ${comment}`);
+
+      // Get the device ID
+      const deviceId = await getDeviceId();
+      console.log('Device ID:', deviceId);
+
+      // Create the appropriate URL for posting comments
+      const url = `http://127.0.0.1:8000/api/v1/videos/${videoId}/comments`;
+
+      console.log(`Sending POST request to ${url}`);
+
+      // Make the API call to your backend
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: deviceId,
+          content: comment
+        }),
+      });
+
+      // Log the response status
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        // Try to get the error details
+        let errorText = '';
+        try {
+          errorText = await response.text();
+          console.error('Error response:', errorText);
+        } catch (e) {
+          console.error('Could not read error response');
+        }
+
+        throw new Error(`Failed to post comment: ${response.status}`);
+      }
+
+      // Parse response
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      // Update the videos array with the new comment count
+      setVideos(prevVideos =>
+        prevVideos.map(video =>
+          video.id === videoId
+            ? {
+                ...video,
+                comment_count: (video.comment_count || 0) + 1
+              }
+            : video
+        )
+      );
+
+      // Fetch the updated comment count from the API
+      try {
+        const countResponse = await fetch(`http://127.0.0.1:8000/api/v1/videos/${videoId}/comments/count`);
+        if (countResponse.ok) {
+          const countData = await countResponse.json();
+          if (countData.count !== undefined) {
+            // Update with the accurate count from the server
+            setVideos(prevVideos =>
+              prevVideos.map(video =>
+                video.id === videoId
+                  ? { ...video, comment_count: countData.count }
+                  : video
+              )
+            );
+          }
+        }
+      } catch (countErr) {
+        console.error('Error fetching updated comment count:', countErr);
+        // Continue with the optimistic update if this fails
+      }
+
+      return data.success || true;
+    } catch (err) {
+      console.error('Error posting comment:', err);
+      return false;
+    }
+  };
+
   const handleLikeToggle = React.useCallback(async (videoId: string, isLiked: boolean): Promise<boolean> => {
     try {
       console.log(`Toggling like for video ${videoId}: ${isLiked ? 'liked' : 'unliked'}`);
@@ -231,7 +329,9 @@ const Homescreen: React.FC = () => {
               isVisible={index === visibleVideoIndex && !isPaused}
               id={item.id}
               likeCount={item.like_count}
+              commentCount={item.comment_count || 0}
               onLikeToggle={handleLikeToggle}
+              onCommentPress={handleCommentPress}
             />
           </View>
         </TouchableWithoutFeedback>
@@ -240,7 +340,7 @@ const Homescreen: React.FC = () => {
         </View>
       </View>
     );
-  }, [handleLikeToggle, isPaused, visibleVideoIndex]);
+  }, [handleLikeToggle, handleCommentPress, isPaused, visibleVideoIndex]);
 
   // Inside the Homescreen component, add this useEffect hook
   React.useEffect(() => {
@@ -337,6 +437,7 @@ const Homescreen: React.FC = () => {
   }, [videos, visibleVideoIndex, resetVideoMemory]);
 
   return (
+    <>
       <FlatList
           // Remove the key prop or make it less aggressive
           // key={`video-list-${resetKey}`}  // Comment this out for now
@@ -376,6 +477,18 @@ const Homescreen: React.FC = () => {
           }}
           onEndReachedThreshold={0.5}
       />
+
+      {/* Comment Modal */}
+      <CommentModal
+        visible={commentModalVisible}
+        onClose={() => setCommentModalVisible(false)}
+        videoId={currentCommentVideoId}
+        initialCommentCount={
+          videos.find(v => v.id === currentCommentVideoId)?.comment_count || 0
+        }
+        onCommentCallback={handleCommentSubmit}
+      />
+    </>
   );
 };
 

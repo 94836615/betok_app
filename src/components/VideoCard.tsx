@@ -13,7 +13,9 @@ interface VideoCardProps {
   isVisible: boolean;
   id: string;
   likeCount?: number;
+  commentCount?: number;
   onLikeToggle?: (videoId: string, isLiked: boolean) => Promise<boolean>;
+  onCommentPress?: (videoId: string) => void;
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({
@@ -21,7 +23,9 @@ const VideoCard: React.FC<VideoCardProps> = ({
   isVisible,
   id,
   likeCount = 0,
+  commentCount = 0,
   onLikeToggle,
+  onCommentPress,
 }) => {
   const videoRef = useRef<any>(null);
   const [isBuffering, setIsBuffering] = useState(true);
@@ -244,7 +248,9 @@ const VideoCard: React.FC<VideoCardProps> = ({
         videoId={id}
         initialLikes={likeCount}
         initialLiked={initialLiked}
+        initialCommentCount={commentCount}
         onLikeToggle={onLikeToggle}
+        onCommentPress={onCommentPress}
       />
 
       {(isBuffering || loadError) && (
