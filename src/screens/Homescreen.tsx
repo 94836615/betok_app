@@ -460,6 +460,7 @@ const Homescreen: React.FC = () => {
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           showsVerticalScrollIndicator={false}
+          testID="videoFlatList"
           ListFooterComponent={
             loading ? (
                 <View

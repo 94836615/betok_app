@@ -86,6 +86,32 @@ You've successfully run and modified your React Native App. :partying_face:
 
 If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
 
+# Testing
+
+## Unit Tests
+
+To run the unit tests:
+
+```sh
+npm run test
+```
+
+## End-to-End Tests
+
+This project uses [Detox](https://github.com/wix/Detox) for end-to-end testing. For detailed instructions on setting up and running the e2e tests, see the [e2e/README.md](e2e/README.md) file.
+
+Quick start:
+
+```sh
+# For Android
+npm run e2e:build:android
+npm run e2e:test:android
+
+# For iOS
+npm run e2e:build:ios
+npm run e2e:test:ios
+```
+
 # Learn More
 
 To learn more about React Native, take a look at the following resources:

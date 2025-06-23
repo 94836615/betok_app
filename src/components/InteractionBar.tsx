@@ -68,11 +68,13 @@ const InteractionBar: React.FC<InteractionBarProps> = ({
   };
 
   return (
-    <View style={styles.interactions}>
+    <View style={styles.interactions} testID="interactionBar">
       <TouchableOpacity
         style={styles.iconBtn}
         onPress={toggleLike}
         disabled={isLoading}
+        testID="likeButton"
+        accessibilityLabel={isLiked ? 'heart' : 'heart-outline'}
       >
         <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
           <Icon
@@ -81,20 +83,20 @@ const InteractionBar: React.FC<InteractionBarProps> = ({
             color={isLiked ? '#ff4d4d' : '#fff'}
           />
         </Animated.View>
-        <Text style={styles.iconText}>{formattedCount}</Text>
+        <Text style={styles.iconText} testID="likeCount">{formattedCount}</Text>
         {error && <Text style={styles.errorText}>{error}</Text>}
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.iconBtn} onPress={handleCommentPress}>
+      <TouchableOpacity style={styles.iconBtn} onPress={handleCommentPress} testID="commentButton">
         <Icon name="chatbubble-outline" size={28} color="#fff" />
-        <Text style={styles.iconText}>{formattedCommentCount}</Text>
+        <Text style={styles.iconText} testID="commentCount">{formattedCommentCount}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.iconBtn}>
+      <TouchableOpacity style={styles.iconBtn} testID="bookmarkButton">
         <Icon name="bookmark-outline" size={28} color="#fff" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.iconBtn} onPress={handleSharePress}>
+      <TouchableOpacity style={styles.iconBtn} onPress={handleSharePress} testID="shareButton">
         <Icon name="share-social-outline" size={28} color="#fff" />
         <Text style={styles.iconText}>Share</Text>
       </TouchableOpacity>

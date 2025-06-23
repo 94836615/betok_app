@@ -107,6 +107,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
+      testID="commentModal"
     >
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay} />
@@ -119,15 +120,15 @@ const CommentModal: React.FC<CommentModalProps> = ({
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Comments ({commentCount})</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Text style={styles.headerTitle} testID="commentTitle">Comments ({commentCount})</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton} testID="closeButton">
               <Icon name="close" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
 
           {/* Comments List */}
           {isLoading && comments.length === 0 ? (
-            <View style={styles.loadingContainer}>
+            <View style={styles.loadingContainer} testID="commentsLoading">
               <ActivityIndicator size="large" color="#fff" />
               <Text style={styles.loadingText}>Loading comments...</Text>
             </View>
@@ -145,16 +146,17 @@ const CommentModal: React.FC<CommentModalProps> = ({
               keyExtractor={(item) => item.id}
               style={styles.commentsList}
               showsVerticalScrollIndicator={false}
+              testID="commentsList"
             />
           ) : (
-            <View style={styles.emptyContainer}>
+            <View style={styles.emptyContainer} testID="emptyComments">
               <Text style={styles.emptyText}>No comments yet. Be the first to comment!</Text>
             </View>
           )}
 
           {/* Input Area */}
           <View style={styles.inputContainer}>
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {error && <Text style={styles.errorText} testID="commentError">{error}</Text>}
             <View style={styles.inputWrapper}>
               <TextInput
                 ref={inputRef}
@@ -165,11 +167,13 @@ const CommentModal: React.FC<CommentModalProps> = ({
                 onChangeText={setCommentText}
                 maxLength={100}
                 multiline
+                testID="commentInput"
               />
               <Text style={[
                 styles.charCounter,
                 charactersLeft < 10 ? styles.charCounterWarning : null
-              ]}>
+              ]}
+              testID="charCounter">
                 {charactersLeft}
               </Text>
               <TouchableOpacity
@@ -179,6 +183,7 @@ const CommentModal: React.FC<CommentModalProps> = ({
                 ]}
                 onPress={handleSubmit}
                 disabled={!commentText.trim() || isLoading}
+                testID="sendButton"
               >
                 {isLoading ? (
                   <ActivityIndicator size="small" color="#fff" />

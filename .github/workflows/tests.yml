@@ -1,4 +1,4 @@
-name: Unit Tests
+name: Tests
 on:
   push:
     branches:
@@ -10,7 +10,8 @@ on:
       - develop
 
 jobs:
-  test:
+  unit-test:
+    name: Unit Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -27,3 +28,43 @@ jobs:
 
       - name: Run unit tests
         run: npm run test
+
+  e2e-test-android:
+    name: E2E Tests (Android)
+    runs-on: macos-latest
+    needs: unit-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm i
+
+      - name: Install detox-cli
+        run: npm install -g detox-cli
+
+      - name: Install Java JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Install Detox dependencies
+        run: |
+          brew tap wix/brew
+          brew install applesimutils
+
+      - name: Build for detox
+        run: npm run e2e:build:android
+
+      - name: Run detox tests
+        run: npm run e2e:test:android

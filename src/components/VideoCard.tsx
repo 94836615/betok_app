@@ -212,7 +212,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="videoCard" accessibilityLabel={id}>
       <Video
         ref={videoRef}
         source={{uri: sanitizedUrl}}  // Always provide the URI
@@ -244,6 +244,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
         ignoreSilentSwitch="ignore"
         controls={false}
         preventsDisplaySleepDuringVideoPlayback={isVisible}
+        testID="videoPlayer"
       />
 
       <InteractionBar
@@ -258,15 +259,15 @@ const VideoCard: React.FC<VideoCardProps> = ({
       />
 
       {(isBuffering || loadError) && (
-        <View style={styles.overlay}>
+        <View style={styles.overlay} testID="videoOverlay">
           {isBuffering && !loadError ? (
             <>
-              <ActivityIndicator size="large" color="#FFFFFF" />
+              <ActivityIndicator size="large" color="#FFFFFF" testID="loadingIndicator" />
               <Text style={styles.overlayText}>Loading video...</Text>
             </>
           ) : (
             <>
-              <Text style={styles.errorText}>{loadError}</Text>
+              <Text style={styles.errorText} testID="errorText">{loadError}</Text>
               <Text style={styles.errorSubtext}>
                 Please check your network connection
               </Text>
