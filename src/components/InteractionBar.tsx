@@ -16,18 +16,22 @@ interface InteractionBarProps {
   initialLikes?: number;
   initialLiked?: boolean;
   videoId?: string;
+  videoUrl?: string;
   initialCommentCount?: number;
   onLikeToggle?: (videoId: string, isLiked: boolean) => Promise<boolean>;
   onCommentPress?: (videoId: string) => void;
+  onSharePress?: (videoUrl: string) => void;
 }
 
 const InteractionBar: React.FC<InteractionBarProps> = ({
   initialLikes = 0,
   initialLiked = false,
   videoId = '',
+  videoUrl = '',
   initialCommentCount = 0,
   onLikeToggle,
   onCommentPress,
+  onSharePress,
 }) => {
   // Use our custom hook for like functionality
   const {
@@ -53,6 +57,13 @@ const InteractionBar: React.FC<InteractionBarProps> = ({
   const handleCommentPress = () => {
     if (onCommentPress && videoId) {
       onCommentPress(videoId);
+    }
+  };
+
+  // Handle share icon press
+  const handleSharePress = () => {
+    if (onSharePress && videoUrl) {
+      onSharePress(videoUrl);
     }
   };
 
@@ -83,8 +94,9 @@ const InteractionBar: React.FC<InteractionBarProps> = ({
         <Icon name="bookmark-outline" size={28} color="#fff" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.iconBtn}>
+      <TouchableOpacity style={styles.iconBtn} onPress={handleSharePress}>
         <Icon name="share-social-outline" size={28} color="#fff" />
+        <Text style={styles.iconText}>Share</Text>
       </TouchableOpacity>
     </View>
   );

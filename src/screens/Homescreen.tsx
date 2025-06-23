@@ -20,6 +20,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { InteractionManager } from 'react-native';
 // Import CommentModal
 import CommentModal from '../components/CommentModal.tsx';
+// Import share utilities
+import { shareVideo } from '../utils/share-utils.ts';
 
 const {height} = Dimensions.get('window');
 
@@ -175,6 +177,12 @@ const Homescreen: React.FC = () => {
     setCurrentCommentVideoId(videoId);
     setCommentModalVisible(true);
   };
+
+  // Handler for share icon press
+  const handleSharePress = React.useCallback((videoUrl: string) => {
+    console.log(`Sharing video URL: ${videoUrl}`);
+    shareVideo(videoUrl);
+  }, []);
 
   // Handler for posting comments
   const handleCommentSubmit = async (videoId: string, comment: string): Promise<boolean> => {
@@ -332,6 +340,7 @@ const Homescreen: React.FC = () => {
               commentCount={item.comment_count || 0}
               onLikeToggle={handleLikeToggle}
               onCommentPress={handleCommentPress}
+              onSharePress={handleSharePress}
             />
           </View>
         </TouchableWithoutFeedback>
@@ -340,7 +349,7 @@ const Homescreen: React.FC = () => {
         </View>
       </View>
     );
-  }, [handleLikeToggle, handleCommentPress, isPaused, visibleVideoIndex]);
+  }, [handleLikeToggle, handleCommentPress, handleSharePress, isPaused, visibleVideoIndex]);
 
   // Inside the Homescreen component, add this useEffect hook
   React.useEffect(() => {

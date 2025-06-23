@@ -16,6 +16,7 @@ interface VideoCardProps {
   commentCount?: number;
   onLikeToggle?: (videoId: string, isLiked: boolean) => Promise<boolean>;
   onCommentPress?: (videoId: string) => void;
+  onSharePress?: (videoId: string) => void;
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({
@@ -26,6 +27,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
   commentCount = 0,
   onLikeToggle,
   onCommentPress,
+  onSharePress,
 }) => {
   const videoRef = useRef<any>(null);
   const [isBuffering, setIsBuffering] = useState(true);
@@ -246,11 +248,13 @@ const VideoCard: React.FC<VideoCardProps> = ({
 
       <InteractionBar
         videoId={id}
+        videoUrl={sanitizedUrl}
         initialLikes={likeCount}
         initialLiked={initialLiked}
         initialCommentCount={commentCount}
         onLikeToggle={onLikeToggle}
         onCommentPress={onCommentPress}
+        onSharePress={onSharePress}
       />
 
       {(isBuffering || loadError) && (

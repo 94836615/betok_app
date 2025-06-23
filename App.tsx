@@ -1,7 +1,9 @@
 import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
-import RootStack from './src/navigation/Navigation.tsx';
+import RootStack from './src/navigation/RootStack.tsx';
 import { setJSExceptionHandler } from 'react-native-exception-handler';
+import { LinkingOptions } from '@react-navigation/native';
+import { RootStackParamList } from './src/navigation/RootStack.tsx';
 
 function App(): React.JSX.Element {
   // Set up global error handling
@@ -11,8 +13,24 @@ function App(): React.JSX.Element {
     // Log to a service like Crashlytics
   }, true);
 
+  // Configure deep linking
+  const linking: LinkingOptions<RootStackParamList> = {
+    prefixes: ['betok://app', 'https://betok.app', 'https://minio.noahnap.nl'],
+    config: {
+      screens: {
+        Main: {
+          screens: {
+            Home: 'home',
+            Create: 'create',
+          },
+        },
+        SharedVideo: 'videos/:videoId(.mov)?',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <RootStack />
     </NavigationContainer>
   );
