@@ -1,3 +1,10 @@
+# [1.2.0-beta.2](https://github.com/94836615/betok_app/compare/v1.2.0-beta.1...v1.2.0-beta.2) (2025-06-23)
+
+
+### Features
+
+* **sharing:** sharing feat ([4156ae6](https://github.com/94836615/betok_app/commit/4156ae6e013dfae9ecc53daca9e72764e998e2fc))
+
 # [1.2.0-beta.1](https://github.com/94836615/betok_app/compare/v1.1.0...v1.2.0-beta.1) (2025-06-23)
 
 
