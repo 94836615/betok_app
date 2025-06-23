@@ -18,7 +18,7 @@ Before running the tests, make sure you have the following installed:
 - Android Studio
 - Java Development Kit (JDK) 11
 - Android SDK
-- An Android emulator (Pixel_8_Pro_Edited_API_35 recommended)
+- An Android emulator (Pixel_Fold_API_35 recommended)
 
 ## Running the Tests
 

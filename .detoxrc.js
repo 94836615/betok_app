@@ -42,7 +42,7 @@ module.exports = {
     emulator: {
       type: 'android.emulator',
       device: {
-        avdName: 'Pixel_8_Pro_Edited_API_35',
+        avdName: 'Pixel_Fold_API_35',
       },
     },
   },
