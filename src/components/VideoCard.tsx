@@ -1,123 +1,192 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {View, StyleSheet, Dimensions, ActivityIndicator, Text} from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Dimensions, ActivityIndicator, Text } from 'react-native';
 import Video from 'react-native-video';
+import InteractionBar from './InteractionBar';
+import { getDeviceId } from '../utils/user-utils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getGlobalLikedVideos } from '../hooks/useLikedVideos';
 
-const {height} = Dimensions.get('window');
-
-// Global set with a maximum size
-const MAX_CACHE_SIZE = 3;
-const cachedVideoIds = new Set<string>();
+const { height } = Dimensions.get('window');
 
 interface VideoCardProps {
   url: string;
   isVisible: boolean;
   id: string;
+  likeCount?: number;
+  commentCount?: number;
+  onLikeToggle?: (videoId: string, isLiked: boolean) => Promise<boolean>;
+  onCommentPress?: (videoId: string) => void;
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({url, isVisible, id}) => {
+const VideoCard: React.FC<VideoCardProps> = ({
+  url,
+  isVisible,
+  id,
+  likeCount = 0,
+  commentCount = 0,
+  onLikeToggle,
+  onCommentPress,
+}) => {
   const videoRef = useRef<any>(null);
   const [isBuffering, setIsBuffering] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
-  const [videoReady, setVideoReady] = useState(false);
+  const [initialLiked, setInitialLiked] = useState(false);
 
-  // Add component mount/unmount logging
+  // Sanitize the URL to ensure it's valid
+  const sanitizedUrl = React.useMemo(() => {
+    if (!url) { return ''; }
+
+    try {
+      // Check if the URL is properly formatted
+      if (url.includes('minio.noahnap.nlvideos')) {
+        // Fix missing slash between domain and path
+        return url.replace('minio.noahnap.nlvideos', 'minio.noahnap.nl/videos');
+      }
+
+      // Test if URL is valid by constructing a URL object
+      new URL(url);
+      return url;
+    } catch (e) {
+      console.error(`Invalid URL format: ${url}`, e);
+      setLoadError(`Invalid URL format: ${url}`);
+      return '';
+    }
+  }, [url]);
+
+  // Load like status on mount
   useEffect(() => {
-    console.log(`VideoCard ${id} mounted`);
+    const loadLikeStatus = async () => {
+      if (!id) return;
+
+      try {
+        // First check AsyncStorage
+        const storageKey = `video_like_${id}`;
+        const savedLike = await AsyncStorage.getItem(storageKey);
+
+        if (savedLike !== null) {
+          setInitialLiked(savedLike === 'true');
+        } else {
+          // If no saved state, check from global store if available
+          const globalStore = getGlobalLikedVideos();
+          if (globalStore && globalStore.isVideoLiked) {
+            setInitialLiked(globalStore.isVideoLiked(id));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading like status:', error);
+      }
+    };
+
+    loadLikeStatus();
+  }, [id]);
+
+  // Fetch like status from API when video becomes visible
+  useEffect(() => {
+    if (!id || typeof isVisible === 'undefined') return;
+
+    // Only fetch when video becomes visible
+    if (isVisible) {
+      const fetchLikeStatus = async () => {
+        try {
+          const deviceId = await getDeviceId();
+
+          const response = await fetch(
+            `http://127.0.0.1:8000/api/v1/videos/${id}/like-status?user_id=${deviceId}`
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            setInitialLiked(data.is_liked);
+
+            // Update AsyncStorage
+            const storageKey = `video_like_${id}`;
+            await AsyncStorage.setItem(storageKey, String(data.is_liked));
+
+            // Update global liked videos store if available
+            const globalStore = getGlobalLikedVideos();
+            if (globalStore && globalStore.setVideoLiked) {
+              globalStore.setVideoLiked(id, data.is_liked);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching like status:', error);
+        }
+      };
+
+      fetchLikeStatus();
+    }
+  }, [id, isVisible]);
+
+  // In VideoCard.tsx - completely revised video cleanup
+  useEffect(() => {
+    console.log(`VideoCard ${id} mounted with URL: ${sanitizedUrl}`);
+
+    // On mount, ensure clean state
+    if (videoRef.current) {
+      videoRef.current.seek(0);
+    }
 
     return () => {
-      console.log(`VideoCard ${id} unmounting`);
+      console.log(`VideoCard ${id} unmounting - aggressive cleanup`);
       isMountedRef.current = false;
 
-      // Ensure video is properly released
       if (videoRef.current) {
         try {
-          // Stop playback and reset position
+          // Stop any playback immediately
+          videoRef.current.setNativeProps({ paused: true });
+
+          // Reset to beginning
           videoRef.current.seek(0);
 
-          // Additional cleanup
-          if (typeof videoRef.current.unload === 'function') {
-            videoRef.current.unload();
-          }
+          // Clear the source - critical for memory release
+          videoRef.current.setNativeProps({ source: null });
+
+          // Null out the ref
+          setTimeout(() => {
+            videoRef.current = null;
+          }, 50);
+
+          console.log(`[Memory] VideoCard ${id} resources forcibly released`);
         } catch (e) {
           console.error(`Error cleaning up video ${id}:`, e);
         }
       }
     };
-  }, [id]);
-
-  // Handle visibility changes
-  useEffect(() => {
-    if (isVisible) {
-      console.log(`Video ${id} is now visible`);
-
-      // Manage cache size
-      if (!cachedVideoIds.has(id)) {
-        // If cache is full, remove one item
-        if (cachedVideoIds.size >= MAX_CACHE_SIZE) {
-          const firstItem = cachedVideoIds.values().next().value;
-          console.log(`Cache full, removing ${firstItem}`);
-          cachedVideoIds.delete(firstItem);
-        }
-
-        // Add current video to cache
-        cachedVideoIds.add(id);
-        console.log(`Added ${id} to cache. Cache size: ${cachedVideoIds.size}`);
-      }
-
-      // Reset playback when becoming visible
-      if (videoRef.current && videoReady) {
-        try {
-          videoRef.current.seek(0);
-        } catch (e) {
-          console.error(`Error seeking video ${id}:`, e);
-        }
-      }
-    } else {
-      console.log(`Video ${id} is now hidden`);
-
-      // When hidden, immediately pause and reset
-      if (videoRef.current) {
-        try {
-          videoRef.current.seek(0);
-        } catch (e) {
-          // Ignore errors when releasing resources
-        }
-      }
-    }
-  }, [isVisible, id, videoReady]);
+  }, [id, sanitizedUrl]);
 
   const onLoadStart = () => {
     if (!isMountedRef.current) return;
     console.log(`Starting to load video: ${id}`);
     setIsBuffering(true);
     setLoadError(null);
-    setVideoReady(false);
   };
 
   const onLoad = (data: any) => {
     if (!isMountedRef.current) return;
-
     console.log(`Video loaded: ${id}, duration: ${data.duration}s`);
     setIsBuffering(false);
-    setVideoReady(true);
-
-    // Start from beginning if visible
-    if (isVisible && videoRef.current) {
-      try {
-        videoRef.current.seek(0);
-      } catch (e) {
-        console.error(`Error seeking video ${id} after load:`, e);
-      }
-    }
   };
 
   const onError = (error: any) => {
     if (!isMountedRef.current) return;
 
-    const errorMessage = error.error?.localizedDescription || 'Video playback error';
-    console.error(`Error playing video ${id}:`, errorMessage);
-    setLoadError(errorMessage);
+    // Extract detailed error information
+    const errorMessage = error.error?.errorString || 'Video playback error';
+    const errorDetails = error.error?.errorException || '';
+    const errorStack = error.error?.errorStackTrace || '';
+
+    console.error(`Error loading video - full details:`, error);
+
+    // Check for specific network errors
+    if (errorStack && errorStack.includes('UnknownHostException')) {
+      setLoadError('Network error: Unable to connect to video server');
+    } else if (errorStack && errorStack.includes('IOException')) {
+      setLoadError('Network error: Problem downloading video');
+    } else {
+      setLoadError(`${errorMessage} ${errorDetails}`);
+    }
+
     setIsBuffering(false);
   };
 
@@ -126,44 +195,17 @@ const VideoCard: React.FC<VideoCardProps> = ({url, isVisible, id}) => {
     setIsBuffering(buffer.isBuffering);
   };
 
-  const onEnd = () => {
-    if (!isMountedRef.current || !isVisible) return;
-
-    console.log(`Video ${id} reached end, looping`);
-    if (videoRef.current) {
-      try {
-        videoRef.current.seek(0);
-      } catch (e) {
-        console.error(`Error seeking to beginning after end for ${id}:`, e);
-      }
+  // Add to VideoCard.tsx, in the component
+  useEffect(() => {
+    if (likeCount > 0 && id) {
+      // Update the stored count with the server value
+      const countKey = `video_like_count_${id}`;
+      AsyncStorage.setItem(countKey, String(likeCount))
+        .catch(error => console.error('Error saving like count:', error));
     }
-  };
+  }, [id, likeCount]);
 
-  // Render loading overlay
-  const renderOverlay = () => {
-    if (!isVisible) return null;
-
-    if (isBuffering) {
-      return (
-        <View style={styles.overlay}>
-          <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.overlayText}>
-            {cachedVideoIds.has(id) ? 'Starting playback...' : 'Loading video...'}
-          </Text>
-        </View>
-      );
-    } else if (loadError) {
-      return (
-        <View style={styles.overlay}>
-          <Text style={styles.errorText}>{loadError}</Text>
-        </View>
-      );
-    }
-    return null;
-  };
-
-  // Return placeholder when not visible
-  if (!isVisible) {
+  if (typeof isVisible === 'undefined' || !isVisible || !sanitizedUrl) {
     return <View style={styles.placeholder} />;
   }
 
@@ -171,31 +213,63 @@ const VideoCard: React.FC<VideoCardProps> = ({url, isVisible, id}) => {
     <View style={styles.container}>
       <Video
         ref={videoRef}
-        source={{uri: url}}
+        source={{uri: sanitizedUrl}}  // Always provide the URI
         style={styles.video}
         resizeMode="cover"
         repeat={true}
-        paused={!isVisible}
+        paused={!isVisible}  // Use paused to control playback instead
+        // Other props remain the same
         muted={!isVisible}
         playInBackground={false}
         onLoadStart={onLoadStart}
         onLoad={onLoad}
         onError={onError}
         onBuffer={onBuffer}
-        onEnd={onEnd}
-        // Minimal buffer settings
-        progressUpdateInterval={1000} // Less frequent updates
+        // Better buffer settings - smaller buffers
+        progressUpdateInterval={1000}
         bufferConfig={{
-          minBufferMs: 5000,           // 5 second buffer minimum
-          maxBufferMs: 15000,          // 15 second maximum buffer
-          bufferForPlaybackMs: 2500,   // Start playback after 2.5s
-          bufferForPlaybackAfterRebufferMs: 5000 // After rebuffer, wait 5s
+          minBufferMs: 2000,           // Reduced buffer size
+          maxBufferMs: 5000,           // Reduced max buffer
+          bufferForPlaybackMs: 1000,   // Smaller playback buffer
+          bufferForPlaybackAfterRebufferMs: 2000,
+        }}
+        // Critical for memory management
+        onEnd={() => {
+          if (videoRef.current) {
+            videoRef.current.seek(0);  // Reset position on end
+          }
         }}
         ignoreSilentSwitch="ignore"
         controls={false}
         preventsDisplaySleepDuringVideoPlayback={isVisible}
       />
-      {renderOverlay()}
+
+      <InteractionBar
+        videoId={id}
+        initialLikes={likeCount}
+        initialLiked={initialLiked}
+        initialCommentCount={commentCount}
+        onLikeToggle={onLikeToggle}
+        onCommentPress={onCommentPress}
+      />
+
+      {(isBuffering || loadError) && (
+        <View style={styles.overlay}>
+          {isBuffering && !loadError ? (
+            <>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={styles.overlayText}>Loading video...</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.errorText}>{loadError}</Text>
+              <Text style={styles.errorSubtext}>
+                Please check your network connection
+              </Text>
+            </>
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -213,7 +287,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 20,
   },
   overlayText: {
     color: '#fff',
@@ -221,10 +296,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   errorText: {
-    color: '#fff',
+    color: '#ff5555',
     textAlign: 'center',
     padding: 15,
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  errorSubtext: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 14,
+    marginTop: 10,
   },
   placeholder: {
     flex: 1,
