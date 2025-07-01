@@ -331,7 +331,7 @@ const Homescreen: React.FC = () => {
     return (
       <View style={styles.videoPage}>
         <TouchableWithoutFeedback onPress={togglePause}>
-          <View style={styles.videoContainer}>
+          <View style={styles.videoContainer} testID="videoCard">
             <VideoCard
               url={item.url}
               isVisible={index === visibleVideoIndex && !isPaused}
@@ -344,7 +344,7 @@ const Homescreen: React.FC = () => {
             />
           </View>
         </TouchableWithoutFeedback>
-        <View style={styles.headerOverlay}>
+        <View style={styles.headerOverlay} testID="profileHeader">
           <ProfileHeader />
         </View>
       </View>
@@ -450,6 +450,7 @@ const Homescreen: React.FC = () => {
       <FlatList
           // Remove the key prop or make it less aggressive
           // key={`video-list-${resetKey}`}  // Comment this out for now
+          testID="homeScreen"
           key="video-list-fixed"  // Use a constant key instead of a changing one
           data={videos}
           renderItem={renderItem}

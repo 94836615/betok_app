@@ -1,21 +1,29 @@
+// android/build.gradle
+
 buildscript {
     ext {
         buildToolsVersion = "35.0.0"
-        minSdkVersion = 24
+        minSdkVersion     = 24
         compileSdkVersion = 35
-        targetSdkVersion = 35
-        ndkVersion = "27.1.12297006"
-        kotlinVersion = "2.0.21"
+        targetSdkVersion  = 35
+        ndkVersion        = "29.0.13599879"
+        kotlinVersion     = "2.0.21"
     }
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle")
-        classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        // Android Gradle Plugin must match your Gradle wrapper version
+        classpath("com.android.tools.build:gradle:8.1.1")
+        // React Native Gradle Plugin matching RN 0.78.x
+        classpath("com.facebook.react:react-native-gradle-plugin:0.78.0")
+        // Kotlin Gradle Plugin
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
     }
+
+
 }
 
+// only apply the “rootproject” hook
 apply plugin: "com.facebook.react.rootproject"
