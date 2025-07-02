@@ -1,0 +1,21 @@
+appId: com.betok
+tags:
+  - e2e
+  - video-interactions
+---
+- launchApp
+- tapOn:
+    id: "shareButton"
+- tapOn:
+    text: "OK"
+- tapOn:
+    id: "commentButton"
+- tapOn:
+    text: "Add a comment..."
+- inputRandomPersonName
+- tapOn:
+    id: "sendButton"
+- tapOn:
+    id: "closeButton"
+- scroll
+- stopApp

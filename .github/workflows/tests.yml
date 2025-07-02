@@ -29,42 +29,20 @@ jobs:
       - name: Run unit tests
         run: npm run test
 
-  e2e-test-android:
-    name: E2E Tests (Android)
-    runs-on: macos-latest
-    needs: unit-test
-
+  maestro-cloud:
+    runs-on: ubuntu-latest
+    outputs:
+      app: app/build/outputs/apk/debug
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
         with:
-          node-version: '20.x'
-
-      - name: Install dependencies
-        run: npm i
-
-      - name: Install detox-cli
-        run: npm install -g detox-cli
-
-      - name: Install Java JDK
-        uses: actions/setup-java@v3
+          java-version: 11
+          distribution: 'temurin'
+      - run: ./gradlew assembleDebug
+      - uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
-          distribution: 'zulu'
-          java-version: '11'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-
-      - name: Install Detox dependencies
-        run: |
-          brew tap wix/brew
-          brew install applesimutils
-
-      - name: Build for detox
-        run: npm run e2e:build:android
-
-      - name: Run detox tests
-        run: npm run e2e:test:android
+          api-key: ${{ secrets.MAESTRO_API_KEY }}
+          # note that you can supply the project id any way you like, it is not secret
+          project-id: ${{ secrets.MAESTRO_PROJECT_ID }}
+          app-file: app/build/outputs/apk/debug/app-debug.apk

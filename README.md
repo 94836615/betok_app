@@ -84,7 +84,31 @@ You've successfully run and modified your React Native App. :partying_face:
 
 # Troubleshooting
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+## Android SDK License Issues
+
+If you encounter errors related to Android SDK licenses not being accepted (especially for NDK components), you can use the built-in script to automatically accept all licenses:
+
+```sh
+# Using npm
+npm run accept-android-licenses
+
+# OR using Yarn
+yarn accept-android-licenses
+```
+
+This script will automatically find your Android SDK location and accept all licenses. The Android build scripts (`npm run android`, `npm run e2e:build:android`, etc.) already include this step, but you can run it separately if needed.
+
+If you still encounter license issues, you can manually accept the licenses using the Android SDK Manager:
+
+```sh
+# On Windows
+sdkmanager.bat --licenses
+
+# On macOS/Linux
+sdkmanager --licenses
+```
+
+For more general troubleshooting, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
 
 # Testing
 
@@ -97,6 +121,8 @@ npm run test
 ```
 
 ## End-to-End Tests
+
+### Detox
 
 This project uses [Detox](https://github.com/wix/Detox) for end-to-end testing. For detailed instructions on setting up and running the e2e tests, see the [e2e/README.md](e2e/README.md) file.
 
@@ -111,6 +137,42 @@ npm run e2e:test:android
 npm run e2e:build:ios
 npm run e2e:test:ios
 ```
+
+### Maestro
+
+This project also uses [Maestro](https://maestro.mobile.dev/) for mobile UI testing. Maestro provides a simple way to write and run UI tests for mobile apps.
+
+To install Maestro:
+
+```sh
+# macOS
+curl -Ls "https://get.maestro.mobile.dev" | bash
+
+# Windows
+curl -Ls "https://get.maestro.mobile.dev" | bash
+```
+
+To run Maestro tests:
+
+```sh
+# For Android
+maestro test maestro/samples/betok-flow.yaml
+
+# For iOS
+maestro test maestro/samples/ios-flow.yaml
+```
+
+Maestro tests are located in the `maestro/samples` directory. The `android-flow.yaml` file contains tests for the Android app, covering key user flows such as:
+
+- Launching the app
+- Verifying the home screen loads with videos
+- Testing video playback (pause/play)
+- Testing scrolling through videos
+- Testing liking a video
+- Testing comments functionality
+- Testing sharing functionality
+
+For more information about Maestro, visit the [Maestro documentation](https://maestro.mobile.dev/getting-started/installing-maestro).
 
 # Learn More
 

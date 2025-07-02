@@ -76,7 +76,7 @@ function PreviewScreen() {
 
       console.log('Sending video to server...');
 
-      const response = await fetch('http://127.0.0.1:8000/api/v1/videos', {
+      const response = await fetch('https://betok.noahnap.nl/api/v1/videos', {
         method: 'POST',
         body: formData,
         headers: {

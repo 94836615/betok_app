@@ -94,7 +94,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
           const deviceId = await getDeviceId();
 
           const response = await fetch(
-            `http://127.0.0.1:8000/api/v1/videos/${id}/like-status?user_id=${deviceId}`
+            `https://betok.noahnap.nl/api/v1/videos/${id}/like-status?user_id=${deviceId}`
           );
 
           if (response.ok) {

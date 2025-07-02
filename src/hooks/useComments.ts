@@ -190,7 +190,7 @@ export const useComments = ({
       setIsLoading(true);
 
       // Fetch comments from the API
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/videos/${videoId}/comments`);
+      const response = await fetch(`https://betok.noahnap.nl/api/v1/videos/${videoId}/comments`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch comments');
@@ -200,7 +200,7 @@ export const useComments = ({
       const commentsData = await response.json();
 
       // Fetch the comment count separately
-      const countResponse = await fetch(`http://127.0.0.1:8000/api/v1/videos/${videoId}/comments/count`);
+      const countResponse = await fetch(`https://betok.noahnap.nl/api/v1/videos/${videoId}/comments/count`);
 
       if (!countResponse.ok) {
         throw new Error('Failed to fetch comment count');

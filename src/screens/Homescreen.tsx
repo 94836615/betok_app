@@ -84,7 +84,7 @@ const Homescreen: React.FC = () => {
       setLoading(true);
 
       const res = await fetch(
-          `http://127.0.0.1:8000/api/v1/videos?limit=2&offset=${offset}`,
+          `https://betok.noahnap.nl/api/v1/videos?limit=2&offset=${offset}`,
       );
       const data = await res.json();
 
@@ -194,7 +194,7 @@ const Homescreen: React.FC = () => {
       console.log('Device ID:', deviceId);
 
       // Create the appropriate URL for posting comments
-      const url = `http://127.0.0.1:8000/api/v1/videos/${videoId}/comments`;
+      const url = `https://betok.noahnap.nl/api/v1/videos/${videoId}/comments`;
 
       console.log(`Sending POST request to ${url}`);
 
@@ -244,7 +244,7 @@ const Homescreen: React.FC = () => {
 
       // Fetch the updated comment count from the API
       try {
-        const countResponse = await fetch(`http://127.0.0.1:8000/api/v1/videos/${videoId}/comments/count`);
+        const countResponse = await fetch(`https://betok.noahnap.nl/api/v1/videos/${videoId}/comments/count`);
         if (countResponse.ok) {
           const countData = await countResponse.json();
           if (countData.count !== undefined) {
@@ -279,7 +279,7 @@ const Homescreen: React.FC = () => {
       console.log('Device ID:', deviceId);
 
       // Create the appropriate URL and method based on the action
-      const url = `http://127.0.0.1:8000/api/v1/videos/${videoId}/like`;
+      const url = `https://betok.noahnap.nl/api/v1/videos/${videoId}/like`;
       const method = isLiked ? 'POST' : 'DELETE';
 
       console.log(`Sending ${method} request to ${url}`);

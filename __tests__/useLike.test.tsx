@@ -124,10 +124,17 @@ describe('useLike Hook', () => {
     expect(result.current.likeCount).toBe(0);
   });
 
-  test('should revert changes when API call fails', () => {
-    const mockCallback = jest.fn().mockResolvedValue(false);
+  test('should revert changes when API call fails', async () => {
+    // Create a mock implementation that simulates the API call failing
+    const mockCallback = jest.fn().mockImplementation(async () => {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 10));
+      // Return false to indicate failure
+      return false;
+    });
 
-    const { result } = renderHook(() =>
+    // Render the hook with our mock
+    const { result, rerender } = renderHook(() =>
       useLike({
         initialLiked: false,
         initialCount: 5,
@@ -136,23 +143,63 @@ describe('useLike Hook', () => {
       })
     );
 
-    act(() => {
+    // Initial state
+    expect(result.current.isLiked).toBe(false);
+    expect(result.current.likeCount).toBe(5);
+
+    // Toggle like - this will optimistically update the state
+    await act(async () => {
       result.current.toggleLike();
+      // Wait for the promise to resolve and state to update
+      await new Promise(resolve => setTimeout(resolve, 50));
     });
 
+    // Verify the callback was called
+    expect(mockCallback).toHaveBeenCalledWith('test-id', true);
+
+    // Should revert back to initial state since API call failed
+    expect(result.current.isLiked).toBe(false);
+    expect(result.current.likeCount).toBe(5);
   });
 
-  test('should save to AsyncStorage when videoId is provided', () => {
-    const { result } = renderHook(() =>
+  test('should save to AsyncStorage when videoId is provided', async () => {
+    // Mock AsyncStorage.setItem to resolve immediately
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(() => Promise.resolve());
+
+    // Mock a successful API call
+    const mockCallback = jest.fn().mockResolvedValue(true);
+
+    // Render the hook with our mock
+    const { result } = renderHook(() => 
       useLike({
         initialLiked: false,
         initialCount: 5,
         videoId: 'test-id',
+        onLikeCallback: mockCallback,
       })
     );
 
-    act(() => {
+    // Clear AsyncStorage calls from initialization
+    (AsyncStorage.setItem as jest.Mock).mockClear();
+
+    // Initial state check
+    expect(result.current.isLiked).toBe(false);
+
+    // Act: Toggle like with a successful API response
+    await act(async () => {
       result.current.toggleLike();
+      // Wait for all promises to resolve
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
+
+    // Assert: Check that the like state was updated
+    expect(mockCallback).toHaveBeenCalledWith('test-id', true);
+
+    // Instead of checking the state directly, check that AsyncStorage was called
+    // with the right parameters, which indicates the state was updated correctly
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      expect.stringContaining('video_like_test-id'), 
+      expect.any(String)
+    );
   });
 });

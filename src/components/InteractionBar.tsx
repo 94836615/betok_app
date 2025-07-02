@@ -68,12 +68,11 @@ const InteractionBar: React.FC<InteractionBarProps> = ({
   };
 
   return (
-    <View style={styles.interactions} testID="interactionBar">
-      <TouchableOpacity
+    <View style={styles.interactions}>
+      <TouchableOpacity testID="likeButton"
         style={styles.iconBtn}
         onPress={toggleLike}
         disabled={isLoading}
-        testID="likeButton"
         accessibilityLabel={isLiked ? 'heart' : 'heart-outline'}
       >
         <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -83,7 +82,7 @@ const InteractionBar: React.FC<InteractionBarProps> = ({
             color={isLiked ? '#ff4d4d' : '#fff'}
           />
         </Animated.View>
-        <Text style={styles.iconText} testID="likeCount">{formattedCount}</Text>
+        <Text style={styles.iconText}>{formattedCount}</Text>
         {error && <Text style={styles.errorText}>{error}</Text>}
       </TouchableOpacity>
 
@@ -92,7 +91,7 @@ const InteractionBar: React.FC<InteractionBarProps> = ({
         <Text style={styles.iconText} testID="commentCount">{formattedCommentCount}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.iconBtn} testID="bookmarkButton">
+      <TouchableOpacity style={styles.iconBtn}>
         <Icon name="bookmark-outline" size={28} color="#fff" />
       </TouchableOpacity>
 

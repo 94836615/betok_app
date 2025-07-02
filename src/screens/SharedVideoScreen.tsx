@@ -44,7 +44,7 @@ const SharedVideoScreen: React.FC<SharedVideoScreenProps> = ({ route, navigation
       setError(null);
 
       // Fetch the video details from the API
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/videos/${videoId}`);
+      const response = await fetch(`https://betok.noahnap.nl/api/v1/videos/${videoId}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch video: ${response.status}`);
