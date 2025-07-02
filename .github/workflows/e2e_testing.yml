@@ -20,10 +20,10 @@ jobs:
 
       - name: Setup Java
         uses: actions/setup-java@v3
+        working-directory: android
         with:
           java-version: '11'
           distribution: 'temurin'
-        working-directory: android
 
       - name: Assemble Release
         run: ./android/gradlew assembleRelease
