@@ -10,8 +10,8 @@ tags:
     text: "OK"
 - tapOn:
     id: "commentButton"
-#- tapOn:
-#    text: "Add a comment..."
+- tapOn:
+    text: "Add a comment..."
 - inputRandomPersonName
 - tapOn:
     id: "sendButton"

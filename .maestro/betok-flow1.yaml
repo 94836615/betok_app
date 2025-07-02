@@ -1,0 +1,16 @@
+appId: com.betok
+tags:
+  - e2e
+  - video-interactions
+---
+- launchApp
+- swipe:
+    direction: down
+    duration: 1000
+- swipe:
+    direction: down
+    duration: 1000
+- swipe:
+    direction: down
+    duration: 1000
+- stopApp
