@@ -15,4 +15,7 @@ tags:
 - inputRandomPersonName
 - tapOn:
     id: "sendButton"
+- hideKeyboard
+- tapOn:
+    id: "closeButton"
 - stopApp
