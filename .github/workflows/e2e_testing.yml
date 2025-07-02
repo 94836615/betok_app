@@ -24,20 +24,13 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
       - name: Setup Android SDK & NDK
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: android-actions/setup-android@v3
         with:
-          api-level: 33
-          build-tools: 33.0.2
-          ndk: 29.0.13599879
-          system-images: none
-          install-emulator: false
-
+          packages: 'ndk;29.0.13599879'
       - name: Assemble Release
         run: ./gradlew assembleRelease
         working-directory: android
-
       - name: Run Maestro Cloud
         uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
