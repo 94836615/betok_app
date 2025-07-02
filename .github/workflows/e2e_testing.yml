@@ -14,7 +14,7 @@ jobs:
   maestro-cloud:
     runs-on: ubuntu-latest
     outputs:
-      app: app/build/outputs/apk/release
+      app: android/app/build/outputs/apk/release
     steps:
       - uses: actions/checkout@v3
 
@@ -27,11 +27,11 @@ jobs:
 
       - name: Assemble Release
         run: ./android/gradlew assembleRelease
+        working-directory: android
 
       - name: Run Maestro Cloud
         uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
           api-key: ${{ secrets.MAESTRO_API_KEY }}
-          # project-id does not need to be secret
           project-id: ${{ secrets.MAESTRO_PROJECT_ID }}
-          app-file: app/build/outputs/apk/release/app-release.apk
+          app-file: android/app/build/outputs/apk/release/app-release.apk
