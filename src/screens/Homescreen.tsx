@@ -334,7 +334,8 @@ const Homescreen: React.FC = () => {
           <View style={styles.videoContainer} testID="videoCard">
             <VideoCard
               url={item.url}
-              isVisible={index === visibleVideoIndex && !isPaused}
+              isVisible={index === visibleVideoIndex}
+              isPaused={isPaused}
               id={item.id}
               likeCount={item.like_count}
               commentCount={item.comment_count || 0}

@@ -11,6 +11,7 @@ const { height } = Dimensions.get('window');
 interface VideoCardProps {
   url: string;
   isVisible: boolean;
+  isPaused?: boolean;
   id: string;
   likeCount?: number;
   commentCount?: number;
@@ -22,6 +23,7 @@ interface VideoCardProps {
 const VideoCard: React.FC<VideoCardProps> = ({
   url,
   isVisible,
+  isPaused = false,
   id,
   likeCount = 0,
   commentCount = 0,
@@ -219,7 +221,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
         style={styles.video}
         resizeMode="cover"
         repeat={true}
-        paused={!isVisible}  // Use paused to control playback instead
+        paused={isPaused || !isVisible}  // Use isPaused prop for pausing
         // Other props remain the same
         muted={!isVisible}
         playInBackground={false}
