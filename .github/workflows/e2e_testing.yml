@@ -22,7 +22,8 @@ jobs:
           java-version: 11
           distribution: 'temurin'
       - name: Maak gradlew uitvoerbaar
-        run: chmod +x gradlew
+        run: chmod +x android/gradlew
+        working-directory: android
       - run: ./gradlew assembleRelease
       - uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
