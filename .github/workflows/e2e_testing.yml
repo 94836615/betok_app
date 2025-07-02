@@ -25,7 +25,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Assemble Release
-        run: ./android/gradlew assembleRelease
+        run: ./gradlew assembleRelease
         working-directory: android
 
       - name: Run Maestro Cloud
