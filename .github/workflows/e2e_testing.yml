@@ -17,7 +17,8 @@ jobs:
       app: android/app/build/outputs/apk/release
     steps:
       - uses: actions/checkout@v3
-
+      - name: Install Node dependencies
+        run: npm ci
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
