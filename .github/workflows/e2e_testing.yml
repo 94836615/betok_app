@@ -25,11 +25,15 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses
-
-      - name: Install Android NDK
-        run: sdkmanager "ndk;29.0.13599879"
+      - name: Setup Android SDK & NDK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          build-tools: 33.0.2
+          ndk: 29.0.13599879
+          system-images: none
+          install-emulator: false
+          script: ''
 
       - name: Assemble Release
         run: ./gradlew assembleRelease
