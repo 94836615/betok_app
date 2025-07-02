@@ -5,8 +5,8 @@ import { useComments } from '../src/hooks/useComments';
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: jest.fn(),
-  setItem: jest.fn(),
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(null),
 }));
 
 // Mock fetch
